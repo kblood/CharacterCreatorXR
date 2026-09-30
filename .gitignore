@@ -12,3 +12,6 @@ cc-xr-*.json
 Thumbs.db
 .vscode/
 .idea/
+
+# local deploy tooling (server + key details)
+deploy.ps1
