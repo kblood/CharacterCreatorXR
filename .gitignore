@@ -1,0 +1,14 @@
+# synced copies of CharacterCreator output (npm run sync) - never commit
+assets/
+vendor/
+# dependencies, build output, screenshots, staged site
+node_modules/
+build/
+# local diagnostics / recordings downloaded from the page
+*.diagnostics.json
+cc-xr-*.json
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

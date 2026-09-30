@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "about": "Finger-channel mapping table for controllers that report per-finger values through the WebXR Gamepad (buttons[]/axes[]). Matched by inputSource.profiles (first match wins), optionally by gamepad.mapping and minimum button/axis counts. Channel spec: {button: i, field: 'value'|'touched'|'pressed'} or {axis: i}; optional min, max, invert, gamma, touchCurl (curl when only touched). A finger without a channel falls back to the trigger/grip/thumb-touch path. Edit on the headset: debug panel -> Finger mapping (stored in localStorage, overrides this file). See docs/HAND_TRACKING.md.",
+  "profiles": [
+    {
+      "id": "emulated-finger-controller",
+      "verified": "emulation only: the IWER test device of tools/emulate_shots.mjs (not a real controller)",
+      "match": { "profiles": ["test-finger-controller"], "minButtons": 11 },
+      "fingers": {
+        "index": { "button": 7, "field": "value" },
+        "middle": { "button": 8, "field": "value" },
+        "ring": { "button": 9, "field": "value" },
+        "little": { "button": 10, "field": "value" },
+        "thumb": { "axis": 4, "min": 0, "max": 1 }
+      }
+    },
+    {
+      "id": "valve-frame-placeholder",
+      "verified": "NO. Placeholder: no WebXR input profile or gamepad layout for the Steam Frame controllers is published (2026-10). Profile ids here are guesses; channels are left empty on purpose so the generic path and the learn wizard decide. Fill in from the debug panel on real hardware.",
+      "match": { "profilesAny": ["valve-frame", "valve-steam-frame", "steam-frame", "valve-frame-controller"] },
+      "fingers": {}
+    },
+    {
+      "id": "valve-index",
+      "verified": "partly: the registry profile 'valve-index' exposes only trigger/squeeze/touchpad/thumbstick/a-button (no per-finger axes), so the fallback path is used. Browsers could add extra channels; the debug panel shows them.",
+      "match": { "profiles": ["valve-index"] },
+      "fingers": {}
+    }
+  ],
+  "fallback": {
+    "about": "xr-standard mapping: button 0 = trigger (index), 1 = squeeze (middle/ring/little), 3.. = thumbstick/face buttons/thumbrest (thumb touch). Touch-only values give a partial curl.",
+    "index": { "button": 0, "field": "value", "touchCurl": 0.3 },
+    "grip": { "button": 1, "field": "value" },
+    "thumbTouch": [3, 4, 5, 6],
+    "thumbCurl": 0.85,
+    "thumbRestCurl": 0.55
+  }
+}

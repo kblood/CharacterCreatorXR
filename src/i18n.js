@@ -1,0 +1,51 @@
+// UI strings (da/en). Keys used by the vendor clothing module are included (clothLoading, clothNone, ...).
+export const STRINGS = {
+  da: {
+    title: 'CharacterCreator XR', enterVR: 'Start VR', noXR: 'Ingen VR-headset fundet - desktop-tilstand (mus + WASD)',
+    xrNeedsHttps: 'WebXR kræver HTTPS eller localhost', loading: 'Indlæser', ready: 'Klar',
+    tabClothes: 'Tøj', tabBody: 'Krop', tabHair: 'Hår', tabScene: 'Scene', tabDebug: 'Debug',
+    clothLoading: 'Indlæser tøj ...', clothError: 'Kunne ikke indlæse tøj', clothNone: '(intet)',
+    clothPrimary: 'Farve', clothSecondary: 'Farve 2', none: 'Ingen', wear: 'Tag på', takeOff: 'Tag af',
+    hairStyle: 'Frisure', hairColor: 'Hårfarve', skin: 'Hudfarve', sex: 'Køn', female: 'Kvinde', male: 'Mand',
+    cloth: 'Stof-fysik', wind: 'Vind', mirror: 'Spejl', handMirror: 'Håndspejl', calibrate: 'Kalibrér højde',
+    calibrateHint: 'Stå oprejst og kig lige frem', calibrated: 'Kalibreret', locomotion: 'Gang',
+    procedural: 'Procedural', clips: 'Klip', handDebug: 'Hånd-skelet', language: 'Sprog', reset: 'Nulstil',
+    quality: 'Kvalitet', high: 'Høj', medium: 'Mellem', low: 'Lav', auto: 'Auto', armMode: 'Arme', match: 'Præcis',
+    proportional: 'Proportional', kneel: 'Knæl', on: 'Til', off: 'Fra', status: 'Status', save: 'Gem diagnostik',
+    learn: 'Lær finger-mapping', learnOpen: 'Åbn hånden', learnFinger: 'Bøj kun', learnDone: 'Mapping gemt',
+    learnFail: 'Ingen fingerkanaler fundet', close: 'Luk', grab: 'Grib for at flytte', body: 'Krop', face: 'Ansigt',
+    dominant: 'Dominant hånd', left: 'Venstre', right: 'Højre', page: 'Side',
+        resetAll: 'Nulstil alt', resetConfirm: 'Tryk igen for at nulstille', resetCalib: 'Nulstil kalibrering', resetBoard: 'Flyt panel tilbage',
+    fingerDebug: 'Finger-debug', saveRecording: 'Gem optagelse', clearLearned: 'Slet lært mapping', notImplemented: 'ikke implementeret',
+    menu: 'Menu', hold: 'Hold', sampling: 'Måler', learnSide: 'Lær', noSource: 'ingen kilde', buttons: 'knapper', axes: 'akser',
+    unverified: 'Steam Frame: ikke verificeret på hardware', slots: { top: 'Overdel', bottom: 'Underdel', shoes: 'Sko', outerwear: 'Overtøj' },
+    calibMode: 'Kalibrering', morph: 'Morph', scale: 'Skala', perf: 'Ydelse', mode: 'Tilstand', diagSaved: 'Diagnostik gemt',
+    gender: 'Køn (K-M)', age: 'Alder', height: 'Højde', weight: 'Vægt', muscle: 'Muskler', proportions: 'Proportioner',
+  },
+  en: {
+    title: 'CharacterCreator XR', enterVR: 'Enter VR', noXR: 'No VR headset found - desktop mode (mouse + WASD)',
+    xrNeedsHttps: 'WebXR needs HTTPS or localhost', loading: 'Loading', ready: 'Ready',
+    tabClothes: 'Clothes', tabBody: 'Body', tabHair: 'Hair', tabScene: 'Scene', tabDebug: 'Debug',
+    clothLoading: 'Loading clothes ...', clothError: 'Could not load clothes', clothNone: '(none)',
+    clothPrimary: 'Colour', clothSecondary: 'Colour 2', none: 'None', wear: 'Wear', takeOff: 'Take off',
+    hairStyle: 'Hair style', hairColor: 'Hair colour', skin: 'Skin colour', sex: 'Sex', female: 'Female', male: 'Male',
+    cloth: 'Cloth physics', wind: 'Wind', mirror: 'Mirror', handMirror: 'Hand mirror', calibrate: 'Calibrate height',
+    calibrateHint: 'Stand straight and look ahead', calibrated: 'Calibrated', locomotion: 'Walking',
+    procedural: 'Procedural', clips: 'Clips', handDebug: 'Hand skeleton', language: 'Language', reset: 'Reset',
+    quality: 'Quality', high: 'High', medium: 'Medium', low: 'Low', auto: 'Auto', armMode: 'Arms', match: 'Exact',
+    proportional: 'Proportional', kneel: 'Kneel', on: 'On', off: 'Off', status: 'Status', save: 'Save diagnostics',
+    learn: 'Learn finger mapping', learnOpen: 'Open your hand', learnFinger: 'Curl only', learnDone: 'Mapping saved',
+    learnFail: 'No finger channels found', close: 'Close', grab: 'Grab to move', body: 'Body', face: 'Face',
+    dominant: 'Dominant hand', left: 'Left', right: 'Right', page: 'Page',
+        resetAll: 'Reset everything', resetConfirm: 'Press again to reset', resetCalib: 'Reset calibration', resetBoard: 'Move panel back',
+    fingerDebug: 'Finger debug', saveRecording: 'Save recording', clearLearned: 'Clear learned mapping', notImplemented: 'not implemented',
+    menu: 'Menu', hold: 'Hold', sampling: 'Sampling', learnSide: 'Learn', noSource: 'no source', buttons: 'buttons', axes: 'axes',
+    unverified: 'Steam Frame: not verified on hardware', slots: { top: 'Top', bottom: 'Bottom', shoes: 'Shoes', outerwear: 'Outerwear' },
+    calibMode: 'Calibration', morph: 'Morph', scale: 'Scale', perf: 'Performance', mode: 'Mode', diagSaved: 'Diagnostics saved',
+    gender: 'Sex (F-M)', age: 'Age', height: 'Height', weight: 'Weight', muscle: 'Muscle', proportions: 'Proportions',
+  },
+};
+
+export function makeT(getLang) {
+  return k => STRINGS[getLang()]?.[k] ?? STRINGS.da[k] ?? k;
+}

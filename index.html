@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CharacterCreator XR</title>
+  <link rel="icon" href="data:,">
+  <style>
+    :root { color-scheme: dark; --bg: #1d2026; --fg: #e8e6e3; --muted: #9aa0a8; --accent: #6cb4ff; --err: #ff8a80; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, sans-serif; overflow: hidden; }
+    canvas { display: block; }
+    #hud { position: fixed; left: 12px; top: 12px; max-width: min(420px, calc(100vw - 24px)); display: flex; flex-direction: column; gap: 8px; z-index: 5; pointer-events: none; }
+    #hud > * { pointer-events: auto; }
+    #enter { font: 600 16px system-ui, sans-serif; padding: 10px 18px; border-radius: 8px; border: 0; background: var(--accent); color: #0b1a2a; cursor: pointer; align-self: flex-start; }
+    #enter:disabled { background: #444a55; color: var(--muted); cursor: default; }
+    #xrmsg, #help { color: var(--muted); font-size: 13px; }
+    #status { white-space: pre-wrap; font-size: 13px; }
+    #status.error { color: var(--err); }
+    #dom-ui { position: fixed; left: 12px; bottom: 12px; z-index: 5; opacity: 0.94; }
+    #dom-ui canvas { display: block; }
+    @media (max-width: 700px) { #help { display: none; } }
+    body.shot #hud > :not(#enter) { display: none; }
+    body.shot #enter { opacity: 0; }
+  </style>
+  <script type="importmap">
+    { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    } }
+  </script>
+</head>
+<body>
+  <div id="hud">
+    <button id="enter" disabled>Start VR</button>
+    <div id="xrmsg"></div>
+    <div id="status"></div>
+    <div id="help">Desktop: træk med musen (eller shift) for at kigge, WASD gå, C huk, mellemrum arme op, F ræk frem, 1-4 fingerstillinger, venstre/højre klik = pegefinger/greb, T tredjeperson.</div>
+  </div>
+  <div id="dom-ui"></div>
+  <script type="module">
+    // ?emulate=quest3|hands|fingers installs the IWER emulator (dev/test only) BEFORE the app touches navigator.xr
+    const emu = new URLSearchParams(location.search).get('emulate');
+    if (emu) { const { installEmulation } = await import('./src/dev/emulate.js'); await installEmulation(emu); }
+    await import('./src/main.js');
+  </script>
+</body>
+</html>

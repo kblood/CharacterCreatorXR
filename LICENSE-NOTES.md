@@ -1,0 +1,16 @@
+# License notes
+
+This is a summary, not legal advice.
+
+| Part | Source | License | Where / consequence |
+|---|---|---|---|
+| Project code (`src/`, `tools/`, `tests/`, `index.html`) | this project | owner's choice (no LICENSE file yet = all rights reserved) | Add a LICENSE before publishing the repo. The IK, finger mapping, mirror and UI are original code; no code was copied from VRIK / Final IK, three-vrm or similar projects. |
+| three.js 0.170 (+ addons: GLTFLoader etc.) | mrdoob/three.js via cdn.jsdelivr.net (importmap) | MIT | Loaded at runtime from the CDN, not vendored. |
+| CharacterCreator web modules (`vendor/cc/`) | the sibling CharacterCreator project (same owner) | owner's choice | Synced copies, git-ignored. They are not modified here; `npm run sync` re-copies them. |
+| Character, hair, clothing assets (`assets/`) | CharacterCreator `output/` (derived from the MakeHuman system assets) | CC0 1.0 (see CharacterCreator's LICENSE-NOTES.md for the per-asset table; the trench coat's extension is project-original) | Synced, git-ignored; shipped in a staged site. |
+| Room, mirror frame, plant, floor marker | generated in code (`src/room.js`) | project code | No external assets. |
+| IWER 2.5.0 (Immersive Web Emulation Runtime) | Meta, npm `iwer` | MIT | **Dev/test only**: loaded only with `?emulate` (from `node_modules`, or from jsDelivr as a fallback). It is excluded from `npm run stage` by default. |
+| puppeteer-core 25 | npm | Apache-2.0 | Dev tool only (screenshots/tests), never shipped. |
+| `tests/fixtures/replay_walk.json` | recorded by this project under IWER emulation | project data | Contains no personal or device data (synthetic emulated tracking). |
+
+No machine paths, IP addresses, user names or keys are in tracked files. Deploy targets are intentionally not part of this repo.
