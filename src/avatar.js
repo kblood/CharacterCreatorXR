@@ -12,11 +12,15 @@ import { createEyeLife, applyMorphWeights } from '../vendor/cc/eyelife.js';
 import { upgradeSkin, upgradeHair, upgradeCornea, setSkinParams, hairUniforms, createHairCollider } from '../vendor/cc/materials.js';
 import { createClothing } from '../vendor/cc/clothing.js';
 import { createClothRuntime } from '../vendor/cc/cloth/runtime.js';
+import { createBreastPhysics, breastMotionScale, combineSupport, zeroWeights } from '../vendor/cc/breastphysics.js';
 import { prepareRig } from './ik/rigdata.js';
 
 export const LAYERS = { MAIN: 0, EYE_L: 1, EYE_R: 2, MONO: 3, HEAD: 4, UI: 5, DEBUG: 6 };
 const DEFAULT_TINTS = { skin: '#c99a80', hairColor: '#3b2a1e', browColor: '#3b2a1e', eyeColor: '#4a2f19', lashes: '#1c1510' };
 const FACE_PART = /^(Eyebrows|Eyelashes|Eyes|Teeth|Tongue)(_\d+)?$/;
+// How much each garment holds the chest (0..1) for the breast physics; same values as the CharacterCreator viewer
+// (web/main.js BREAST_SUPPORT at the synced commit). Unknown garments: 0.
+export const BREAST_SUPPORT = { tshirt: 0.2, trenchcoat: 0.3, bra: 0.5, shirt: 0.25, hoodie: 0.3 };
 const fetchJson = url => fetch(url).then(r => (r.ok ? r.json() : null)).catch(() => null);
 
 /**
@@ -43,10 +47,11 @@ export async function createAvatar(opts) {
   let body = meshes.find(m => m.name === 'Body') ?? meshes.find(m => /skin/i.test([].concat(m.material)[0]?.name || '')) ?? meshes[0];
   if (!body) throw new Error('base_body.glb: no skinned body mesh');
   const parts = [body];
-  const values = { ...DEFAULT_TINTS, hair: null };
-  for (const s of CC.SLIDERS) values[s.id] = Number(S.body?.[s.id]) || 0;
+  const values = { ...DEFAULT_TINTS, hair: null, ...bodyDefaults() };
+  for (const s of CC.SLIDERS) { const v = S.body?.[s.id]; if (v != null && Number.isFinite(Number(v))) values[s.id] = Number(v); }
   if (S.skin) values.skin = S.skin;
-  applySexParam(values, S.sex);
+  applySexParam(values, S.sex);                       // ?sex= wins over the stored body
+  normaliseSex(values);
   const colliders = new Map();
   const eyeLife = createEyeLife({ blink: true });
   const q = opts.quality || {};
@@ -73,7 +78,9 @@ export async function createAvatar(opts) {
     if (joints) CC.applySkeleton(body, joints, values);
     CC.applyTints(body.parent || body, tints());
     setSkinParams({ gender: values.gender });
-    for (const c of colliders.values()) c.calibrate();
+    // hair capsules: rest pose + current morphs, grown to the worn garments' back (a hood / collar under long hair)
+    const garments = parts.filter(m => m.visible && m.name.startsWith('Cloth_'));
+    for (const c of colliders.values()) c.calibrate(garments);
     hairUniforms.ccCollide.value = 1;
     if (humanoid) remeasure();
   }
@@ -139,6 +146,26 @@ export async function createAvatar(opts) {
     return ms;
   }
   function showHair(id) { for (const [k, ms] of hairCache) for (const m of ms) m.visible = k === id; }
+  // Hair swap: keep the current and the previous style (quick toggling back), fully release the others
+  // (scene, parts, colliders, GPU buffers / textures / programs). hairStats() for the tests / perf HUD.
+  const hairOrder = [];
+  let hairEvicted = 0;
+  function evictHair(keepId) {
+    const i = hairOrder.indexOf(keepId);
+    if (i >= 0) hairOrder.splice(i, 1);
+    hairOrder.unshift(keepId);
+    while (hairOrder.length > 2) {
+      const id = hairOrder.pop(), ms = hairCache.get(id);
+      if (!ms) continue;
+      for (const m of ms) {
+        m.removeFromParent();
+        const k = parts.indexOf(m); if (k >= 0) parts.splice(k, 1);
+        colliders.get(m)?.dispose?.(); colliders.delete(m);
+        disposeGPU(m);
+      }
+      hairCache.delete(id); hairEvicted++;
+    }
+  }
   async function setHair(id) {
     id = id || null;
     values.hair = id;
@@ -149,6 +176,7 @@ export async function createAvatar(opts) {
       if (token !== hairToken) return;
       for (const m of ms) if (!parts.includes(m)) parts.push(m);
       showHair(id);
+      evictHair(id);
       update();
     } catch (e) {
       console.error('[avatar] hair failed', e);
@@ -161,8 +189,50 @@ export async function createAvatar(opts) {
     loader, lang: opts.lang(), t, setStatus,
     getBody: () => body,
     addPart: m => { if (!parts.includes(m)) parts.push(m); },
-    onChange: () => { update(); cloth?.reset(); markHeadParts(root); },
+    getSex: () => CC.sexOf(values),                 // default underwear per sex (briefs / panties + bra)
+    underwear: S.underwear !== false,               // ?underwear=0 / settings: no default underwear
+    onChange: () => { update(); cloth?.reset(); breast.reset(); markHeadParts(root); releaseUnworn(); },
   });
+  // Garments that are not worn: free their GPU memory (buffers, textures, programs). The vendor module keeps the
+  // CPU copy in its cache, so wearing it again is instant (three.js re-uploads on the next draw).
+  const released = new Set();
+  function releaseUnworn() {
+    const worn = new Set(clothing.worn());
+    for (const m of parts) {
+      const id = m.userData.ccClothing;
+      if (!id) continue;
+      if (worn.has(id)) { released.delete(m); continue; }
+      if (m.visible || released.has(m)) continue;
+      disposeGPU(m); released.add(m);
+    }
+  }
+
+  // ---- breast physics (vendor/cc/breastphysics.js): female only, morph weights on every part, driver = spine_03 ----
+  const breast = createBreastPhysics();
+  const breastBone = body.skeleton.bones.find(b => b.name === 'spine_03') ?? null;
+  const breastRestInv = breastBone ? breastBone.getWorldQuaternion(new THREE.Quaternion()).invert() : null;  // at rest
+  let breastWeights = zeroWeights(), breastScale = 0, breastSupport = 0, breastApplied = true, breastZeroed = new WeakSet();
+  const _bp = new THREE.Vector3(), _bq = new THREE.Quaternion(), _bpA = [0, 0, 0], _bqA = [0, 0, 0, 1];
+  function updateBreast(dt) {
+    breastSupport = combineSupport(clothing.worn().map(id => BREAST_SUPPORT[id] ?? 0));
+    breastScale = S.breastPhysics !== false && breastBone
+      ? breastMotionScale({ gate: CC.breastGate(values), size: values.breastSize, firmness: values.breastFirmness, support: breastSupport }) : 0;
+    if (breastScale > 0) {
+      breastBone.getWorldPosition(_bp);
+      breastBone.getWorldQuaternion(_bq).multiply(breastRestInv);
+      // the spring works in the avatar's own metres: undo the calibration scale of the root
+      const k = 1 / (root.scale.x || 1);
+      _bpA[0] = _bp.x * k; _bpA[1] = _bp.y * k; _bpA[2] = _bp.z * k;
+      _bqA[0] = _bq.x; _bqA[1] = _bq.y; _bqA[2] = _bq.z; _bqA[3] = _bq.w;
+      breastWeights = breast.step(dt, _bpA, _bqA, breastScale, breastSupport);
+      for (const m of parts) applyMorphWeights(m, breastWeights);
+      breastApplied = true;
+    } else {
+      if (breastApplied) { breast.reset(); breastWeights = zeroWeights(); breastZeroed = new WeakSet(); breastApplied = false; }
+      // a garment loaded later starts with its glTF default weights (1 for every target): zero its dyn_* morphs once
+      for (const m of parts) if (!breastZeroed.has(m)) { applyMorphWeights(m, breastWeights); breastZeroed.add(m); }
+    }
+  }
 
   // ---- cloth ----
   let cloth = null;
@@ -206,13 +276,21 @@ export async function createAvatar(opts) {
     placement.position = position; placement.yaw = yaw; placement.scale = scale;
   }
 
-  /** Eyes (blink + gaze), hair capsules, cloth. Call after applyIK. */
-  function tick(dt, gaze = null) {
+  /**
+   * Eyes (blink + gaze), hair capsules, breast physics, cloth. Call after applyIK.
+   * opts.physics = false (session blurred / tracking lost): eyes only, the springs and the cloth hold still.
+   * The cloth steps every clothEvery-th frame with the summed dt (quality auto-scaler; 1 = every frame).
+   */
+  let clothEvery = 1, clothN = 0, clothDt = 0;
+  function tick(dt, gaze = null, opts = {}) {
     root.updateMatrixWorld(true);
     lastWeights = eyeLife.update(dt, gaze);
     for (const m of parts) applyMorphWeights(m, lastWeights);
+    if (opts.physics === false) { for (const m of parts) applyMorphWeights(m, breastWeights); return; }
+    updateBreast(dt);                                 // morph weights only: before the cloth skins the garments
     for (const [m, c] of colliders) if (m.visible) c.update();
-    cloth?.update(dt, parts);
+    clothDt += dt;
+    if (++clothN >= clothEvery) { cloth?.update(Math.min(clothDt, 0.1), parts); clothN = 0; clothDt = 0; }
   }
 
   /** First-person: collapse the head bone (the Body mesh's own head) around the main (headset) render only. */
@@ -223,20 +301,38 @@ export async function createAvatar(opts) {
     headBone.updateMatrixWorld(true);
   }
 
-  // Sex: CharacterCreator is adding a binary sex value; until the synced character.js exposes one, the 'gender'
-  // slider (female -1 .. male +1) is used. Detected generically so an upstream change needs no code change here.
+  // Sex: binary (character.js SEXES / sexOf / genderOfSex at the synced commit; the 'gender' slider is +1 / -1).
+  // Changing it swaps worn underwear of the other sex (clothing.setSex) and resets the physics.
   const sexApi = detectSex();
 
   return {
     root, body, parts, values, clothing, get cloth() { return cloth; }, get humanoid() { return humanoid; }, get rig() { return rig; },
     hairManifest, placement, eyeLife, loader, sex: sexApi, defaultTints: DEFAULT_TINTS,
+    breast: {
+      state: () => ({ enabled: S.breastPhysics !== false, sex: CC.sexOf(values), scale: breastScale, support: breastSupport, ...breast.state(), weights: { ...breastWeights } }),
+      reset: () => breast.reset(),
+    },
+    /** Slider defs of a page ('body' | 'face' | 'breast'); binary sliders (sex) are switches, not sliders. */
+    slidersOf: group => CC.SLIDERS.filter(s => (s.group || 'body') === group && !s.binary),
+    isFemale: () => CC.sexOf(values) === 'female',
+    bodyDefaults,
     ready: Promise.all([hairDone, clothDone]),
     onRig(f) { rigListeners.push(f); if (rig) f(rig); },
     update, applyIK, tick, hideHead,
+    get clothEvery() { return clothEvery; }, set clothEvery(n) { clothEvery = Math.max(1, n | 0); },
     setHair, get hair() { return values.hair; },
+    /** Loaded hair styles / evictions, released (GPU-freed) garment meshes. */
+    memoryStats: () => ({ hairLoaded: [...hairCache.keys()], hairEvicted, garmentsReleased: released.size }),
     setHairColor(hex) { values.hairColor = hex; values.browColor = hex; update(); },
     setSkin(hex) { values.skin = hex; update(); },
-    setSlider(id, v) { values[id] = Math.max(-1, Math.min(1, +v || 0)); update(); cloth?.reset(); },
+    setSlider(id, v) { values[id] = Math.max(-1, Math.min(1, +v || 0)); if (id === 'gender') normaliseSex(values); update(); cloth?.reset(); },
+    /** Every body slider back to the character.js defaults (male unless keepSex). */
+    resetBody({ keepSex = false } = {}) {
+      const g = values.gender;
+      Object.assign(values, bodyDefaults());
+      if (keepSex) values.gender = g;
+      update(); cloth?.reset(); breast.reset();
+    },
     sliders: CC.SLIDERS,
     bodyValues,
     weights: () => ({ ...lastWeights }),
@@ -250,22 +346,51 @@ export async function createAvatar(opts) {
   };
 
   function detectSex() {
-    const opt = CC.SEX_OPTIONS || CC.SEXES || null;               // future upstream export (array of ids)
-    const setter = CC.applySex || null;
-    if (Array.isArray(opt) && typeof setter === 'function') {
-      return { kind: 'upstream', options: opt, get: () => values.sex ?? opt[0], set: v => { values.sex = v; setter(body, v, values); update(); } };
+    if (CC.SEXES && typeof CC.sexOf === 'function') {
+      return {
+        kind: 'binary', options: Object.keys(CC.SEXES), get: () => CC.sexOf(values),
+        set: sx => {
+          const g = typeof CC.genderOfSex === 'function' ? CC.genderOfSex(sx) : CC.SEXES[sx];
+          if (g == null) return Promise.resolve();
+          values.gender = g; update(); cloth?.reset(); breast.reset();
+          return clothing.setSex(CC.sexOf(values));
+        },
+      };
     }
-    const hasGender = CC.SLIDERS.some(s => s.id === 'gender');
-    if (!hasGender) return null;
-    return { kind: 'gender-slider', options: ['female', 'male'], get: () => (values.gender >= 0 ? 'male' : 'female'),
-      set: v => { values.gender = v === 'male' ? 1 : -1; update(); cloth?.reset(); } };
+    // older synced character.js without the binary sex API: the gender slider (-1 .. +1)
+    if (!CC.SLIDERS.some(s => s.id === 'gender')) return null;
+    return { kind: 'gender-slider', options: ['male', 'female'], get: () => (values.gender >= 0 ? 'male' : 'female'),
+      set: v => { values.gender = v === 'male' ? 1 : -1; update(); cloth?.reset(); return Promise.resolve(); } };
   }
 }
 
+/** Free the GPU side of a mesh: geometry buffers, material programs and textures (CPU data stays). */
+function disposeGPU(m) {
+  m.geometry?.dispose();
+  for (const mat of [].concat(m.material || [])) {
+    for (const v of Object.values(mat)) if (v && v.isTexture) v.dispose();
+    for (const u of Object.values(mat.uniforms || {})) if (u?.value?.isTexture) u.value.dispose();
+    mat.dispose();
+  }
+}
+
+/** character.js defaultValues() (male, every slider at its default), or the slider defaults of an older sync. */
+function bodyDefaults() {
+  if (typeof CC.defaultValues === 'function') return CC.defaultValues();
+  return Object.fromEntries(CC.SLIDERS.map(s => [s.id, s.default ?? 0]));
+}
+
+/** Binary sex: a fractional gender stored by an older version snaps to +1 / -1. */
+function normaliseSex(values) {
+  if (!CC.SEXES || typeof CC.sexOf !== 'function') return;
+  values.gender = CC.sexOf(values) === 'female' ? CC.SEXES.female : CC.SEXES.male;
+}
+
+/** ?sex= : 'male' | 'female' | 'm' | 'f' | 1 | 0 (female, MakeHuman convention) | -1 (character.js genderOfSex). */
 function applySexParam(values, sex) {
-  if (!sex) return;
-  if (sex === 'female') values.gender = -1;
-  else if (sex === 'male') values.gender = 1;
+  if (sex == null || sex === '') return;
+  const g = typeof CC.genderOfSex === 'function' ? CC.genderOfSex(sex) : sex === 'female' ? -1 : sex === 'male' ? 1 : null;
+  if (g != null) values.gender = g;
 }
 
 /** Face parts that must not be seen by the user's own eyes (first person) but must be in the mirror. */

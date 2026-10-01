@@ -8,6 +8,7 @@
 // Pure and engine-agnostic: the browser snapshots each XRInputSource into a plain object (snapshotSource) and
 // this module never touches WebXR objects, so it is unit-tested in node. docs/HAND_TRACKING.md.
 import { fingerStateFromJoints, fingerStateFromCurls, limitFingerState, blendFingerStates, XR_JOINTS } from '../ik/fingers.js';
+import { createOneEuro, oneEuro, resetOneEuro } from '../ik/filters.js';
 
 export const FINGER_KEYS = ['thumb', 'index', 'middle', 'ring', 'little'];
 const CAP = { thumb: 'Thumb', index: 'Index', middle: 'Middle', ring: 'Ring', little: 'Little' };
@@ -115,7 +116,7 @@ export function evaluateSource(snap, table, restHand = null) {
     const r = fingerStateFromJoints(side, snap.joints);
     if (r && Object.values(r.fingers).every(Boolean)) {
       const paths = Object.fromEntries(FINGER_KEYS.map(k => [k, 'hand']));
-      return { state: limitFingerState(r.fingers, restHand), kind: 'hand', paths, profile: null, frame: r.frame };
+      return { state: limitFingerState(r.fingers, restHand), raw: r.fingers, kind: 'hand', paths, profile: null, frame: r.frame };
     }
   }
   const gp = snap.gamepad;
@@ -139,30 +140,125 @@ export function evaluateSource(snap, table, restHand = null) {
   return { state: limitFingerState(state, restHand), kind: any ? 'controller-finger' : gp ? 'controller' : 'rest', paths, profile: prof?.id ?? null, curls };
 }
 
+/** Largest per-angle difference (rad) between two finger states (null fingers ignored). */
+function maxAngleDiff(a, b) {
+  let m = 0;
+  for (const f of Object.keys(a || {})) {
+    const x = a[f], y = b?.[f];
+    if (!x || !y) continue;
+    for (const k of ['yaw', 'dyaw', 'pitch', 'bend1', 'bend2']) if (Number.isFinite(x[k]) && Number.isFinite(y[k])) m = Math.max(m, Math.abs(x[k] - y[k]));
+  }
+  return m;
+}
+
+export const RELAXED_CURLS = { index: 0.15, middle: 0.2, ring: 0.22, little: 0.25, thumb: 0.1 };
+const relaxedState = () => fingerStateFromCurls(RELAXED_CURLS, Object.fromEntries(FINGER_KEYS.map(k => [k, 'rest'])));
+const ANGLES = ['yaw', 'dyaw', 'pitch', 'bend1', 'bend2'];
+// One-Euro parameters per source: hand tracking jitters at rest (strong smoothing, little lag when moving);
+// controller channels are clean analog values (light smoothing)
+export const FINGER_FILTER = {
+  hand: { minCutoff: 2.2, beta: 0.35, dCutoff: 1 },
+  controller: { minCutoff: 6, beta: 0.05, dCutoff: 1 },
+};
+export const FINGER_INPUT_DEFAULTS = {
+  holdTime: 0.5,        // s a lost source keeps its last finger pose
+  relaxTime: 0.6,       // s to blend from the held pose to the relaxed hand afterwards
+  switchTime: 0.25,     // s blend when the source kind changes (controller <-> hand)
+  spreadAdapt: 6,       // s time constant of the learned open-hand spread (rest-pose retargeting)
+  retarget: true,
+};
+
 /**
- * Stateful smoothing wrapper: createFingerInput(table) -> { update(snaps, dt, rig) -> {left, right}, setTable }.
- * Keeps the last state per hand and blends when the source kind changes (no pops on inputsourceschange).
+ * Stateful layer: createFingerInput(table, opts) -> { update(snaps, dt, rig) -> {left, right}, setTable }.
+ *  - One-Euro filter on every finger angle (per source kind, FINGER_FILTER)
+ *  - a source switch (controller put down -> hand tracking) blends instead of popping
+ *  - lost tracking (source gone, or a hand-tracking source without tracked joints): hold the last pose for
+ *    holdTime, then blend to a relaxed hand over relaxTime; out[side].lost / .held report it
+ *  - rest-pose retargeting of the finger spread (XRHand only): the user's own open-hand spread per finger is
+ *    learned slowly while that finger is straight, and deviations from it are applied on top of the avatar's
+ *    rest spread (a user with naturally splayed fingers does not get a splayed avatar hand)
  */
-export function createFingerInput(table) {
-  const st = { table, prev: { left: null, right: null }, kind: { left: null, right: null }, blend: { left: 1, right: 1 } };
+export function createFingerInput(table, opts = {}) {
+  const o = { ...FINGER_INPUT_DEFAULTS, ...opts };
+  const mk = () => ({ prev: null, kind: null, blend: 1, lost: 0, held: null, filters: {}, fkind: null, neutral: {}, relax: relaxedState() });
+  const st = { table, left: mk(), right: mk() };
+  function filtered(H, state, dt, kind) {
+    const fk = kind === 'hand' ? 'hand' : 'controller';
+    if (H.fkind !== fk) { for (const k in H.filters) resetOneEuro(H.filters[k]); H.fkind = fk; }
+    const P = FINGER_FILTER[fk], out = {};
+    for (const f in state) {
+      const a = state[f];
+      if (!a) { out[f] = null; continue; }
+      const b = { ...a };
+      for (const k of ANGLES) {
+        if (a[k] == null || !Number.isFinite(a[k])) continue;
+        const key = f + k;
+        const flt = H.filters[key] || (H.filters[key] = createOneEuro(P));
+        flt.minCutoff = P.minCutoff; flt.beta = P.beta; flt.dCutoff = P.dCutoff;
+        b[k] = oneEuro(flt, a[k], dt);
+      }
+      out[f] = b;
+    }
+    return out;
+  }
+  function retarget(H, raw, restHand, dt) {
+    if (!o.retarget || !restHand) return raw;
+    const out = { ...raw };
+    for (const f of ['Index', 'Middle', 'Ring', 'Little']) {
+      const a = raw[f], rest = restHand.fingers?.[f]?.rest;
+      if (!a || a.yaw == null || !Number.isFinite(a.yaw) || !rest) continue;
+      if (H.neutral[f] == null) H.neutral[f] = rest.yaw;
+      if ((a.curl ?? 1) < 0.25 && dt > 0) H.neutral[f] += (a.yaw - H.neutral[f]) * (1 - Math.exp(-dt / o.spreadAdapt));
+      out[f] = { ...a, yaw: rest.yaw + (a.yaw - H.neutral[f]) };
+    }
+    return out;
+  }
   return {
+    options: o,
     setTable(t) { st.table = t; },
     get table() { return st.table; },
+    /** Forget the learned spread (e.g. another user). */
+    resetRetarget() { st.left.neutral = {}; st.right.neutral = {}; },
+    neutral: side => ({ ...st[side].neutral }),
     update(snaps, dt, rig) {
       const out = {};
+      dt = Math.max(0, dt || 0);
       for (const side of ['left', 'right']) {
+        const H = st[side];
         const snap = snaps.find(s => s.handedness === side);
         const restHand = rig?.hands?.[side] || null;
-        const ev = snap ? evaluateSource(snap, st.table, restHand) : { state: fingerStateFromCurls({ index: 0.15, middle: 0.2, ring: 0.22, little: 0.25, thumb: 0.1 }, Object.fromEntries(FINGER_KEYS.map(k => [k, 'rest']))), kind: 'rest', paths: Object.fromEntries(FINGER_KEYS.map(k => [k, 'rest'])), profile: null };
-        // a source switch (controller put down -> hand tracking) blends over ~0.25 s instead of popping
-        if (st.kind[side] && st.kind[side] !== ev.kind) st.blend[side] = 0;
-        st.kind[side] = ev.kind;
-        st.blend[side] = Math.min(1, st.blend[side] + Math.max(0, dt || 0) / 0.25);
-        const tau = st.blend[side] < 1 ? 0.12 : ev.kind === 'hand' ? 0.025 : 0.045;
-        const a = dt > 0 ? 1 - Math.exp(-dt / tau) : 1;
-        const state = st.prev[side] ? blendFingerStates(st.prev[side], ev.state, a) : ev.state;
-        st.prev[side] = state;
-        out[side] = { ...ev, state, blend: st.blend[side] };
+        let ev = snap ? evaluateSource(snap, st.table, restHand) : null;
+        const hadSource = H.kind && H.kind !== 'rest';
+        const lostNow = hadSource && (!ev || ev.kind === 'rest');
+        if (lostNow && H.prev) {
+          H.lost += dt;
+          if (!H.held) H.held = H.prev;
+          const k = H.lost <= o.holdTime ? 0 : Math.min(1, (H.lost - o.holdTime) / o.relaxTime);
+          const state = blendFingerStates(H.held, H.relax, k * k * (3 - 2 * k));
+          H.prev = state;
+          const tag = k < 1 ? 'held' : 'rest';
+          out[side] = { state, kind: tag, paths: Object.fromEntries(FINGER_KEYS.map(f => [f, tag])), profile: null, lost: true, held: k < 1, blend: H.blend };
+          if (k >= 1) H.kind = 'rest';
+          continue;
+        }
+        // no source, or a source with nothing to read (hand tracking without joints, no gamepad): the RELAXED hand,
+        // not the flat zero-curl state evaluateSource returns for 'rest' (review finding)
+        if (!ev || ev.kind === 'rest') ev = { state: H.relax, kind: 'rest', paths: Object.fromEntries(FINGER_KEYS.map(k => [k, 'rest'])), profile: null };
+        if (H.lost > 0) { H.lost = 0; H.held = null; H.blend = 0; }
+        if (ev.kind === 'hand' && ev.raw) ev = { ...ev, state: limitFingerState(retarget(H, ev.raw, restHand, dt), restHand) };
+        if (H.kind && H.kind !== ev.kind) { H.blend = 0; H.easing = true; }
+        H.kind = ev.kind;
+        H.blend = Math.min(1, H.blend + dt / o.switchTime);
+        const f = filtered(H, ev.state, dt, ev.kind);
+        // while switching sources: ease from the previous pose (no pop)
+        // (the ease runs until it has converged, not just for switchTime: cutting it there left a ~4% step)
+        let state = f;
+        if (H.prev && (H.blend < 1 || H.easing)) {
+          state = blendFingerStates(H.prev, f, dt > 0 ? 1 - Math.exp(-dt / 0.08) : 1);
+          if (H.blend >= 1 && maxAngleDiff(state, f) < 0.01 * Math.PI / 180) { state = f; H.easing = false; }
+        } else H.easing = false;
+        H.prev = state;
+        out[side] = { ...ev, state, blend: H.blend, lost: false, held: false };
       }
       return out;
     },

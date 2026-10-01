@@ -1,13 +1,16 @@
 #!/usr/bin/env node
 // Copies the built CharacterCreator assets and the shared web modules into this project.
 //
-//   node tools/sync_assets.mjs [--src <path to the CharacterCreator repo>] [--dry] [--anim]
+//   node tools/sync_assets.mjs [--source|--src <dir>] [--commit <sha>] [--dry] [--no-anim]
 //
-// Source: --src, else $CC_SRC, else the sibling folder ../CharacterCreator (relative to this repo).
+// Source: --source / --src, else $CC_SRC, else the sibling folder ../CharacterCreator (relative to this repo).
+// The source may be a plain export of a commit instead of a checkout (recommended while someone else is working in
+// the repo):  git -C ../CharacterCreator archive <sha> output web | tar -x -C <tmpdir>
+// then pass --source <tmpdir> --commit <sha> (an export has no .git, so the commit is recorded from --commit).
 // The CharacterCreator repo is only READ. Everything written here is a synced copy:
 //   assets/     output/base_body.glb, base_body.joints.json, hair*.glb + hair.json, clothing*.glb + clothing.json,
-//               body_colliders.json (+ output/animations/*.json with --anim)
-//   vendor/cc/  web/character.js, clothing.js, clothing_rules.js, materials.js, humanoid.js, eyelife.js,
+//               body_colliders.json, asset_licenses.json, output/animations/*.json (skip with --no-anim)
+//   vendor/cc/  web/character.js, clothing.js, clothing_rules.js, materials.js, humanoid.js, eyelife.js, breastphysics.js,
 //               animation/*.js, cloth/*.js
 // Both folders are git-ignored; vendor/cc/SYNCED.json records what was copied (size + sha256, source commit if
 // the source is a git checkout). Never edit files in vendor/cc/: the next sync overwrites them.
@@ -21,12 +24,13 @@ const root = resolve(here, '..');
 const argv = process.argv.slice(2);
 const arg = k => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : undefined; };
 const dry = argv.includes('--dry');
-const withAnim = argv.includes('--anim');
-const src = resolve(arg('--src') || process.env.CC_SRC || join(root, '..', 'CharacterCreator'));
+const withAnim = !argv.includes('--no-anim');
+const commitArg = arg('--commit');
+const src = resolve(arg('--source') || arg('--src') || process.env.CC_SRC || join(root, '..', 'CharacterCreator'));
 
 if (!existsSync(join(src, 'web', 'character.js')) || !existsSync(join(src, 'output'))) {
   console.error(`sync: ${src} does not look like the CharacterCreator repo (web/character.js, output/ missing).`);
-  console.error('Pass --src <path> or set CC_SRC.');
+  console.error('Pass --source <path> or set CC_SRC.');
   process.exit(2);
 }
 
@@ -42,8 +46,9 @@ const ASSET_RULES = [
   { re: /^clothing\.json$/ },
   { re: /^clothing_[\w-]+\.glb$/ },
   { re: /^body_colliders\.json$/ },
+  { re: /^asset_licenses\.json$/ },
 ];
-const WEB_FILES = ['character.js', 'clothing.js', 'clothing_rules.js', 'materials.js', 'humanoid.js', 'eyelife.js'];
+const WEB_FILES = ['character.js', 'clothing.js', 'clothing_rules.js', 'materials.js', 'humanoid.js', 'eyelife.js', 'breastphysics.js'];
 const WEB_DIRS = ['animation', 'cloth'];
 
 const sha = f => createHash('sha256').update(readFileSync(f)).digest('hex');
@@ -98,8 +103,8 @@ while (!dry && queue.length) {
 
 // ---- manifest ----
 // The source commit is read from .git/HEAD as a plain file: the sync never runs git in the source repo.
-let commit = null;
-try {
+let commit = commitArg || null;
+if (!commit) try {
   const head = readFileSync(join(src, '.git', 'HEAD'), 'utf8').trim();
   if (head.startsWith('ref: ')) {
     const ref = head.slice(5);
@@ -113,7 +118,8 @@ try {
 } catch { /* not a git checkout: fine */ }
 const manifest = {
   note: 'SYNCED COPIES from the CharacterCreator repo (tools/sync_assets.mjs). Do not edit; re-run the sync instead. '
-    + 'sourceCommit is the checked-out commit; the working tree may contain uncommitted changes on top of it.',
+    + 'sourceCommit is the checked-out commit (or --commit for an exported tree); a checkout may contain uncommitted changes on top of it.',
+  sourceKind: existsSync(join(src, '.git')) ? 'checkout' : 'export',
   syncedAt: new Date().toISOString(), sourceCommit: commit,
   files: copied,
 };

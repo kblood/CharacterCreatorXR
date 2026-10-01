@@ -6,6 +6,7 @@
 import { snapshotSource, XR_JOINTS } from '../input/fingerInput.js';
 import { handFrame } from '../ik/rigdata.js';
 import { qMul, qFromColumns, vAdd, vScale, qRotate } from '../ik/qx.js';
+import { createPoseFilter, filterPose, resetPoseFilter } from '../ik/filters.js';
 
 // Grip space (WebXR): origin in the fist, -Z toward the thumb along the handle, +X out of the back of the hand
 // for the right hand (-X for the left). Hence fingers F = -Y, radial R = -Z, dorsal D = +-X.
@@ -32,19 +33,32 @@ export function handFromJoints(side, J) {
   return { pos: [...J.wrist], quat: f.q };
 }
 
-export function createXRTracking(renderer) {
+/**
+ * opts: { gripOffset: () => [x,y,z] wrist offset from the grip origin in the hand frame (m),
+ *         smoothHands: () => bool (One-Euro on hand-tracking wrist poses; controllers are not filtered) }
+ */
+export function createXRTracking(renderer, opts = {}) {
   const jointBuf = new Float32Array(16 * 25);
   const radiiBuf = new Float32Array(25);
+  const filt = { left: createPoseFilter(), right: createPoseFilter() };
+  const lastKind = { left: null, right: null };
+  const last = { head: null, t: -1 };
   let t = 0;
   return {
-    /** XR frame -> tracking record (null when the viewer pose is unavailable). */
+    /** Viewer pose lost (tracking lost / system UI): the last head pose is kept and flagged. */
+    get lastHead() { return last.head; },
+    /** XR frame -> tracking record. Without a viewer pose the last head pose is returned with headLost = true. */
     read(frame, dt) {
       t += dt;
       const ref = renderer.xr.getReferenceSpace();
       const session = frame.session;
       const vp = frame.getViewerPose(ref);
-      if (!vp) return null;
-      const head = { pos: arr3(vp.transform.position), quat: arr4(vp.transform.orientation) };
+      if (!vp) {
+        if (!last.head) return null;
+        return { t, head: last.head, eyes: null, hands: { left: { valid: false }, right: { valid: false } }, snaps: [], sources: [], headLost: true };
+      }
+      const head = { pos: arr3(vp.transform.position), quat: arr4(vp.transform.orientation), emulated: !!vp.emulatedPosition };
+      last.head = head;
       const eyes = {};
       for (const v of vp.views) {
         const k = v.eye === 'left' ? 'L' : v.eye === 'right' ? 'R' : 'M';
@@ -72,10 +86,15 @@ export function createXRTracking(renderer) {
             hp = handFromJoints(side, joints);
           }
         }
+        if (hp && opts.smoothHands?.() !== false) {
+          if (lastKind[side] !== 'hand') resetPoseFilter(filt[side]);
+          filterPose(filt[side], hp.pos, hp.quat, dt, hp);
+        }
         if (!hp && src.gripSpace) {
           const p = frame.getPose(src.gripSpace, ref);
-          if (p) hp = handFromGrip(side, arr3(p.transform.position), arr4(p.transform.orientation));
+          if (p) hp = handFromGrip(side, arr3(p.transform.position), arr4(p.transform.orientation), opts.gripOffset?.() || GRIP_WRIST_OFFSET);
         }
+        lastKind[side] = hp ? (joints ? 'hand' : 'controller') : null;
         let ray = null;
         if (src.targetRaySpace) {
           const p = frame.getPose(src.targetRaySpace, ref);

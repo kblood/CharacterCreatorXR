@@ -8,6 +8,7 @@
 //   curl  = 0..1 summary (for UI/debug), src = 'hand' | 'controller-finger' | 'controller' | 'rest' | 'sim'
 import { FINGERS, SEGMENTS, fingerJoint, handFrame, fingerAxes, chainAngles } from './rigdata.js';
 import { clamp, vReject, vNorm, vCross, vLen, vScale, vAdd, vSub, qFromTo, qMul, qRotate, qAxisAngle, finite3 } from './qx.js';
+import * as PM from './pm.js';
 
 const D = Math.PI / 180;
 
@@ -22,16 +23,25 @@ export const XR_CHAINS = {
 export const XR_JOINTS = ['wrist', 'thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal', 'thumb-tip',
   ...['index', 'middle', 'ring', 'pinky'].flatMap(f => ['metacarpal', 'phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal', 'tip'].map(s => `${f}-finger-${s}`))];
 
-/** Absolute joint limits (rad). yaw limits are relative to the avatar's rest yaw of that finger. */
+/**
+ * Per-finger joint limits (rad), from common anatomical ranges (MCP flexion ~90 deg with a little
+ * hyperextension, PIP ~110, DIP ~80-90; more abduction for index / little than for the middle finger).
+ * yaw (+ = toward the thumb side) is relative to the avatar's rest yaw of that finger.
+ * Thumb: pitch / yaw = CMC (the metacarpal), bend1 = MCP, bend2 = IP.
+ */
 export const LIMITS = {
-  finger: { pitch: [-25 * D, 95 * D], yaw: [-25 * D, 25 * D], bend1: [-5 * D, 115 * D], bend2: [-10 * D, 95 * D] },
+  Index: { pitch: [-25 * D, 95 * D], yaw: [-15 * D, 25 * D], bend1: [-5 * D, 115 * D], bend2: [-10 * D, 90 * D] },
+  Middle: { pitch: [-25 * D, 95 * D], yaw: [-15 * D, 15 * D], bend1: [-5 * D, 115 * D], bend2: [-10 * D, 90 * D] },
+  Ring: { pitch: [-25 * D, 98 * D], yaw: [-20 * D, 12 * D], bend1: [-5 * D, 115 * D], bend2: [-10 * D, 90 * D] },
+  Little: { pitch: [-30 * D, 100 * D], yaw: [-30 * D, 15 * D], bend1: [-5 * D, 115 * D], bend2: [-10 * D, 90 * D] },
   Thumb: { pitch: [-35 * D, 65 * D], yaw: [-55 * D, 30 * D], bend1: [-25 * D, 80 * D], bend2: [-25 * D, 95 * D] },
 };
-const lim = f => (f === 'Thumb' ? LIMITS.Thumb : LIMITS.finger);
+LIMITS.finger = LIMITS.Middle;                         // older name (tests, docs)
+const lim = f => LIMITS[f] || LIMITS.Middle;
 
 // Curl 0..1 -> absolute angles (open hand .. fist). Thumb: 0 = relaxed/up, 1 = pressed across the fingers.
 const OPEN = { pitch: 4 * D, bend1: 6 * D, bend2: 4 * D }, FIST = { pitch: 82 * D, bend1: 100 * D, bend2: 65 * D };
-const THUMB_OPEN = { pitch: 0, bend1: 0, bend2: 5 * D, dyaw: 0 }, THUMB_DOWN = { pitch: 32 * D, bend1: 28 * D, bend2: 45 * D, dyaw: -28 * D };
+const THUMB_OPEN = { pitch: 0, bend1: 0, bend2: 5 * D, dyaw: 0 }, THUMB_DOWN = { pitch: -15 * D, bend1: 75 * D, bend2: 0, dyaw: -10 * D };   // fist: across the index / middle
 
 /** Hand frame + finger state from XR joint positions (a Map/obj name -> [x,y,z], any frame). null if unusable. */
 export function fingerStateFromJoints(side, joints) {
@@ -168,3 +178,46 @@ export function syntheticJoints(rigHand, side, fs, handDelta, wrist, restWrist) 
 }
 
 export { FINGERS, SEGMENTS };
+
+// ---- allocation-free variant for the per-frame solve (pooled math, src/ik/pm.js) ----
+
+function handCache(rigHand, side) {
+  const hf = rigHand.frame;
+  const c = { names: [], axes: [], Kh: [], rest: [] };
+  for (const f of FINGERS) {
+    c.names.push([0, 1, 2].map(k => fingerJoint(side, f, k)));
+    const ax = fingerAxes(f, hf);
+    c.axes.push({ F: [...ax.F], D: [...ax.D], R: [...ax.R] });
+    c.Kh.push(vNorm(vCross(ax.D, ax.F)));
+    const r = rigHand.fingers[f];
+    c.rest.push([0, 1, 2].map(k => vNorm(vSub(r.pts[k + 1], r.pts[k]))));
+  }
+  return c;
+}
+function nextDirP(p, bend, Kh, D) {
+  let K = PM.vReject(Kh, p);
+  if (PM.vLen(K) < 1e-6) K = PM.vReject(D, p);
+  return PM.qRotate(PM.qAxisAngle(PM.vNorm(K), bend), p);
+}
+
+/**
+ * Same as fingerWorldDeltas, but writes the 15 finger joints of one hand into W (persistent quaternion arrays
+ * per joint name) without allocating. Missing fingers (or fs = null) follow the hand (rest pose relative to it).
+ */
+export function fingerWorldDeltasInto(W, rigHand, side, fs, handDelta) {
+  const c = rigHand._pc || (rigHand._pc = handCache(rigHand, side));
+  for (let fi = 0; fi < 5; fi++) {
+    const f = FINGERS[fi], names = c.names[fi], a = fs ? fs[f] : null;
+    if (!a) { PM.set4(W[names[0]], handDelta); PM.set4(W[names[1]], handDelta); PM.set4(W[names[2]], handDelta); continue; }
+    const rest = rigHand.fingers[f], ax = c.axes[fi];
+    const yaw = (a.yaw == null ? rest.rest.yaw : a.yaw) + (a.dyaw || 0), pitch = a.pitch || 0;
+    const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+    const v1 = PM.vNorm(PM.v3(ax.R[0] * sy * cp + ax.F[0] * cy * cp - ax.D[0] * sp, ax.R[1] * sy * cp + ax.F[1] * cy * cp - ax.D[1] * sp, ax.R[2] * sy * cp + ax.F[2] * cy * cp - ax.D[2] * sp));
+    const v2 = nextDirP(v1, a.bend1 || 0, c.Kh[fi], ax.D), v3 = nextDirP(v2, a.bend2 || 0, c.Kh[fi], ax.D);
+    const r = c.rest[fi];
+    const W1 = PM.qFromTo(r[0], v1);
+    const W2 = PM.qMul(PM.qFromTo(PM.qRotate(W1, r[1]), v2), W1);
+    const W3 = PM.qMul(PM.qFromTo(PM.qRotate(W2, r[2]), v3), W2);
+    PM.set4(W[names[0]], PM.qMul(handDelta, W1)); PM.set4(W[names[1]], PM.qMul(handDelta, W2)); PM.set4(W[names[2]], PM.qMul(handDelta, W3));
+  }
+}

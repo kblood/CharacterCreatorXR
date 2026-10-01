@@ -9,7 +9,8 @@
     "serve": "node tools/serve.mjs",
     "test": "node --test \"tests/*.test.mjs\"",
     "shots": "node tools/emulate_shots.mjs",
-    "stage": "node tools/stage_site.mjs"
+    "stage": "node tools/stage_site.mjs",
+    "bench": "node --expose-gc --min-semi-space-size=256 --max-semi-space-size=256 tools/bench_ik.mjs"
   },
   "devDependencies": {
     "iwer": "^2.5.0",

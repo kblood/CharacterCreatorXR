@@ -51,7 +51,7 @@ test('joint limits clamp impossible hand-tracking angles', () => {
   for (const f of FINGERS) bad[f] = { yaw: 3, pitch: -2, bend1: 3, bend2: -1, curl: 0, src: 'hand' };
   const lim = limitFingerState(bad, RIG.hands.left);
   for (const f of FINGERS) {
-    const L = f === 'Thumb' ? LIMITS.Thumb : LIMITS.finger;
+    const L = LIMITS[f];
     assert.ok(lim[f].pitch >= L.pitch[0] - 1e-9 && lim[f].pitch <= L.pitch[1] + 1e-9);
     assert.ok(lim[f].bend1 <= L.bend1[1] + 1e-9 && lim[f].bend2 >= L.bend2[0] - 1e-9);
     assert.ok(lim[f].yaw - RIG.hands.left.fingers[f].rest.yaw <= L.yaw[1] + 1e-9);

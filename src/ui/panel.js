@@ -4,6 +4,7 @@
 // (pointerDown/Move/Up with a pointer id), so ray, poke and mouse all share one path (src/ui/interact.js).
 import * as THREE from 'three';
 import { LAYERS } from '../avatar.js';
+import { createSliderDrag } from './uilogic.js';
 
 export const THEME = {
   bg: 'rgba(24,27,33,0.92)', bgSolid: '#181b21', panel: '#232730', fg: '#eceae6', muted: '#9aa1ab', accent: '#6cb4ff', accentFg: '#0b1a2a',
@@ -60,7 +61,8 @@ export function createPanel({ name = 'Panel', px = [1024, 704], size = [0.9, 0.6
     toPixels(lx, ly) { return [(lx / size[0] + 0.5) * px[0], (0.5 - ly / size[1]) * px[1]]; },
     pointerMove(pid, x, y) {
       const pr = P.pressed.get(pid);
-      if (pr && pr.kind === 'slider') { sliderSet(pr, x, false); return pr; }
+      if (pr && pr.kind === 'slider') { sliderMove(pr, x); return pr; }
+      if (pr && pr.kind === 'area') { if (x != null) { pr.onPoint?.(x - pr.x, y - pr.y, 'move'); P.dirty = true; } return pr; }
       const w = x == null ? null : P.widgetAt(x, y);
       if (P.hover.get(pid) !== w) { if (w) P.hover.set(pid, w); else P.hover.delete(pid); P.dirty = true; }
       return w;
@@ -69,14 +71,16 @@ export function createPanel({ name = 'Panel', px = [1024, 704], size = [0.9, 0.6
       const w = P.widgetAt(x, y);
       if (!w) return null;
       P.pressed.set(pid, w); P.dirty = true;
-      if (w.kind === 'slider') sliderSet(w, x, false);
+      if (w.kind === 'slider') { w._sd ||= createSliderDrag(); w._sd.down(track(w), x, w.value(), performance.now()); }
+      if (w.kind === 'area') w.onPoint?.(x - w.x, y - w.y, 'down');
       return w;
     },
     pointerUp(pid, x, y) {
       const w = P.pressed.get(pid);
       P.pressed.delete(pid); P.dirty = true;
       if (!w) return null;
-      if (w.kind === 'slider') { sliderSet(w, x ?? w._lastX, true); return w; }
+      if (w.kind === 'slider') { sliderUp(w, x); return w; }
+      if (w.kind === 'area') { w.onPoint?.(x == null ? null : x - w.x, y == null ? null : y - w.y, 'up'); return w; }
       if (x != null && P.widgetAt(x, y) === w) { w.onClick?.(w); return w; }
       return null;
     },
@@ -92,16 +96,21 @@ export function createPanel({ name = 'Panel', px = [1024, 704], size = [0.9, 0.6
     },
   };
 
-  function sliderSet(w, x, final) {
-    if (x == null) return;
-    w._lastX = x;
-    const tx = w.x + w.trackX, tw = w.w - w.trackX - w.valueW;
-    let v = w.min + Math.max(0, Math.min(1, (x - tx) / tw)) * (w.max - w.min);
-    if (w.step) v = Math.round(v / w.step) * w.step;
+  // sliders: deadzone on press, knob-relative drag, release hysteresis (src/ui/uilogic.js createSliderDrag)
+  const track = w => ({ x: w.x + w.trackX, w: w.w - w.trackX - w.valueW, min: w.min, max: w.max, step: w.step });
+  function sliderMove(w, x) {
+    if (x == null || !w._sd) return;
+    const v = w._sd.move(track(w), x, performance.now());
+    if (v == null) return;
     w._drag = v; P.dirty = true;
     const now = performance.now();
-    if (final || !w._t || now - w._t > (w.throttle ?? 60)) { w._t = now; w.onChange?.(v, final); }
-    if (final) w._drag = null;
+    if (!w._t || now - w._t > (w.throttle ?? 60)) { w._t = now; w.onChange?.(v, false); }
+  }
+  function sliderUp(w, x) {
+    if (!w._sd) return;
+    const v = w._sd.up(track(w), x, performance.now());
+    w._drag = null; P.dirty = true;
+    w.onChange?.(v, true);
   }
 
   function draw() {
@@ -124,18 +133,29 @@ export function createPanel({ name = 'Panel', px = [1024, 704], size = [0.9, 0.6
         c.fillStyle = w.color || (w.kind === 'label' ? T.muted : T.fg);
         c.textAlign = w.align || 'left';
         const x = w.align === 'center' ? w.x + w.w / 2 : w.align === 'right' ? w.x + w.w : w.x;
-        const lines = String(w.label ?? '').split('\n');
+        // greedy word wrap to the widget width (long sentences, e.g. Danish, would otherwise be cut off)
+        const lines = [];
+        for (const para of String(w.label ?? '').split('\n')) {
+          let cur = '';
+          for (const word of para.split(' ')) {
+            const next = cur ? `${cur} ${word}` : word;
+            if (cur && c.measureText(next).width > w.w) { lines.push(cur); cur = word; } else cur = next;
+          }
+          lines.push(cur);
+        }
         const lh = fs * 1.25;
+        const maxLines = Math.max(1, Math.floor((w.h + fs * 0.3) / lh));   // more lines than fit: the last one is cut
+        if (lines.length > maxLines) lines.splice(maxLines - 1, lines.length, lines.slice(maxLines - 1).join(' '));
         lines.forEach((ln, i) => c.fillText(fitText(c, ln, w.w), x, w.y + w.h / 2 + (i - (lines.length - 1) / 2) * lh));
         break;
       }
       case 'button': case 'tab': case 'toggle': {
         const active = typeof w.active === 'function' ? w.active() : w.active;
         rr(c, w.x, w.y, w.w, w.h, w.r ?? 12);
-        c.fillStyle = w.disabled ? T.disabled : active ? T.accent : prs ? T.accent : hov ? T.buttonHover : T.button;
+        c.fillStyle = w.disabled ? T.disabled : active ? T.accent : prs ? T.accent : hov ? T.buttonHover : (w.color || T.button);
         c.fill();
         if (hov && !w.disabled) { c.lineWidth = 3; c.strokeStyle = T.accent; c.stroke(); }
-        c.fillStyle = w.disabled ? T.muted : active ? T.accentFg : T.fg;
+        c.fillStyle = w.disabled ? T.muted : active || (w.color && !hov && !prs) ? T.accentFg : T.fg;
         c.textAlign = 'center';
         let label = w.label;
         if (w.kind === 'toggle') label = `${w.label}: ${w.value() ? w.onText : w.offText}`;
@@ -174,6 +194,25 @@ export function createPanel({ name = 'Panel', px = [1024, 704], size = [0.9, 0.6
         if (v > 0) { rr(c, w.x, w.y, Math.max(6, w.w * v), w.h, 4); c.fillStyle = w.color || T.accent; c.fill(); }
         break;
       }
+      case 'tile': {          // thumbnail tile: image (canvas / bitmap / null) + caption
+        const active = typeof w.active === 'function' ? w.active() : w.active;
+        rr(c, w.x, w.y, w.w, w.h, 14);
+        c.fillStyle = active ? '#2c4a6b' : hov ? T.buttonHover : T.button; c.fill();
+        if (active || hov) { c.lineWidth = active ? 5 : 3; c.strokeStyle = T.accent; c.stroke(); }
+        const capH = w.caption ? 34 : 0, pad = 8, iw = w.w - 2 * pad, ih = w.h - capH - 2 * pad;
+        const img = typeof w.image === 'function' ? w.image() : w.image;
+        if (img) {
+          const k = Math.min(iw / img.width, ih / img.height), dw = img.width * k, dh = img.height * k;
+          c.drawImage(img, w.x + pad + (iw - dw) / 2, w.y + pad + (ih - dh) / 2, dw, dh);
+        } else if (w.placeholder) w.placeholder(c, w.x + pad, w.y + pad, iw, ih);
+        if (w.caption) {
+          c.fillStyle = active ? T.fg : T.fg; c.textAlign = 'center'; c.font = `500 ${w.captionFont || 22}px ${T.font}`;
+          c.fillText(fitText(c, w.caption, w.w - 10), w.x + w.w / 2, w.y + w.h - capH / 2 - 2);
+        }
+        if (w.badge) { c.fillStyle = T.accent; c.beginPath(); c.arc(w.x + w.w - 16, w.y + 16, 9, 0, 7); c.fill(); }
+        break;
+      }
+      case 'area': w.draw?.(c, w, hov, prs); break;
       case 'custom': w.draw(c, w, hov, prs); break;
       default: break;
     }
@@ -197,8 +236,11 @@ export function flow(x0, y0, maxX, gap = 12) {
   return L;
 }
 
-export const btn = (label, w, onClick, extra = {}) => ({ kind: 'button', label, w, h: 60, interactive: true, onClick, ...extra });
-export const toggle = (label, w, value, onClick, t) => ({ kind: 'toggle', label, w, h: 60, interactive: true, value, onClick, onText: t('on'), offText: t('off') });
-export const slider = (label, w, min, max, value, onChange, extra = {}) => ({ kind: 'slider', label, w, h: 56, min, max, value, onChange, interactive: true, trackX: extra.trackX ?? 230, valueW: extra.valueW ?? 90, ...extra });
+export const btn = (label, w, onClick, extra = {}) => ({ kind: 'button', label, w, h: 72, interactive: true, onClick, ...extra });
+export const toggle = (label, w, value, onClick, t) => ({ kind: 'toggle', label, w, h: 72, interactive: true, value, onClick, onText: t('on'), offText: t('off') });
+export const slider = (label, w, min, max, value, onChange, extra = {}) => ({ kind: 'slider', label, w, h: 64, min, max, value, onChange, interactive: true, trackX: extra.trackX ?? 230, valueW: extra.valueW ?? 90, ...extra });
 export const label = (text, w, extra = {}) => ({ kind: 'label', label: text, w, h: 40, ...extra });
 export const swatch = (color, active, onClick, size = 52) => ({ kind: 'swatch', color, w: size, h: size, active, onClick, interactive: true });
+export const tile = (caption, w, h, image, onClick, extra = {}) => ({ kind: 'tile', caption, w, h, image, onClick, interactive: true, ...extra });
+/** Free-form interactive area: onPoint(localX, localY, 'down' | 'move' | 'up') (local px; null on 'up' outside). */
+export const area = (w, h, draw, onPoint, extra = {}) => ({ kind: 'area', w, h, draw, onPoint, interactive: true, ...extra });

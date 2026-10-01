@@ -13,7 +13,9 @@
     #hud > * { pointer-events: auto; }
     #enter { font: 600 16px system-ui, sans-serif; padding: 10px 18px; border-radius: 8px; border: 0; background: var(--accent); color: #0b1a2a; cursor: pointer; align-self: flex-start; }
     #enter:disabled { background: #444a55; color: var(--muted); cursor: default; }
-    #xrmsg, #help { color: var(--muted); font-size: 13px; }
+    #xrmsg { color: var(--muted); font-size: 13px; }
+    #help { color: var(--fg); font-size: 13px; background: rgba(12, 14, 18, 0.72); padding: 6px 10px; border-radius: 6px; }
+    #xrmsg:not(:empty) { background: rgba(12, 14, 18, 0.72); padding: 6px 10px; border-radius: 6px; }
     #status { white-space: pre-wrap; font-size: 13px; }
     #status.error { color: var(--err); }
     #dom-ui { position: fixed; left: 12px; bottom: 12px; z-index: 5; opacity: 0.94; }

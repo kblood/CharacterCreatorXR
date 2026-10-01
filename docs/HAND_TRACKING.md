@@ -13,8 +13,16 @@ All sources end up in one hand frame. The IK uses it as the target of the avatar
 It is computed per source:
 
 - **XRHand:** from the `wrist`, `index-finger-phalanx-proximal`, `middle-finger-phalanx-proximal` and `pinky-finger-phalanx-proximal` joints, using the same construction as the avatar's own hand frame (`rigdata.handFrame`). The two frames agree by construction.
-- **Controller:** from the **grip space**. The grip → hand rotation is fixed (`src/xr/tracking.js` `GRIP_TO_HAND`), and the wrist is 8.5 cm behind and 1.8 cm dorsal of the grip origin (`GRIP_WRIST_OFFSET`, same for every controller).
+- **Controller:** from the **grip space**.
+  - The grip → hand rotation is fixed (`src/xr/tracking.js` `GRIP_TO_HAND`).
+  - The wrist is 8.5 cm behind and 1.8 cm dorsal of the grip origin (`GRIP_WRIST_OFFSET`, the same for every controller).
+  - The offset can be overridden with `settings.gripOffset` (`[x, y, z]` in the hand frame, metres). The test checks the wrist sits behind the grip along −fingers.
   - **Unverified:** per-device offsets. Real controllers differ by a few cm.
+- **Wrist smoothing (hand tracking only):**
+  - A One-Euro pose filter (`src/ik/filters.js`): position per axis (min cutoff 1.2 Hz, beta 6) and orientation by slerp with an adaptive alpha.
+  - It removes jitter at rest and follows fast motion with little lag. A gap of more than 0.25 s snaps.
+  - Controllers are not filtered.
+  - System > *Smooth hands* switches it off.
 
 ## Finger input layer (`src/input/fingerInput.js`)
 
@@ -33,14 +41,29 @@ Pure module with no WebXR objects; node-tested (`tests/fingers.test.mjs`).
 Mapping is per finger: a profile can map only some fingers, and the rest use path (c).
 
 3. **Smooth.**
-   - Per hand, finger states are low-pass filtered: 25 ms for hands, 45 ms for controllers.
-   - On a source switch (controller put down → hand tracking, `inputsourceschange`), they blend over 0.25 s.
-4. **Limit.** Joint limits are applied in degrees (`src/ik/fingers.js` `LIMITS`):
+   - Every finger angle has a One-Euro filter (`FINGER_FILTER`):
+     - hand tracking: min cutoff 2.2 Hz, beta 0.35 (strong at rest);
+     - controller channels: 6 Hz, beta 0.05.
+   - On a source switch (controller put down → hand tracking, `inputsourceschange`), they blend over 0.25 s. An exponential ease (0.08 s) runs until it has converged, so the end of the switch has no step. Before, it stopped at 0.25 s and left a step of about 4 %.
+4. **Lost tracking.** When the source disappears, or a hand source has no tracked joints:
+   - the last finger pose is **held** for 0.5 s;
+   - then it blends to a relaxed hand over 0.6 s.
+   - `out[side].lost/.held` report it.
+   - A hand that never had a source is simply relaxed. So is a source with nothing to read (hand tracking without joints and no gamepad) once the hold is over. Before, that case gave a flat hand with zero curl.
+5. **Spread retargeting (XRHand only).**
+   - The user's own open-hand spread per finger is learned slowly (time constant 6 s, only while that finger is straight).
+   - Only deviations from it are applied on top of the avatar's rest spread, so naturally splayed fingers do not give a splayed avatar hand.
+6. **Limit.** Per-finger joint limits are applied in degrees (`src/ik/fingers.js` `LIMITS`):
 
-| | pitch (MCP flex) | yaw (spread, relative to rest) | bend1 (PIP) | bend2 (DIP) |
+| | pitch (MCP flex) | yaw (spread) | bend1 (PIP) | bend2 (DIP) |
 |---|---|---|---|---|
-| index … little | −25 … 95 | −25 … 25 | −5 … 115 | −10 … 95 |
+| index | −25 … 95 | −15 … 25 | −5 … 115 | −10 … 90 |
+| middle | −25 … 95 | −15 … 15 | −5 … 115 | −10 … 90 |
+| ring | −25 … 98 | −20 … 12 | −5 … 115 | −10 … 90 |
+| little | −30 … 100 | −30 … 15 | −5 … 115 | −10 … 90 |
 | thumb | −35 … 65 | −55 … 30 | −25 … 80 | −25 … 95 |
+
+**Left/right:** the measurement is mirror-consistent. Mirrored left-hand joints read as the same angles on the right hand (`tests/fingers2.test.mjs`), and the full IK has a mirror-symmetry test (`tests/ik_arms.test.mjs`).
 
 ### Measuring and applying finger angles
 
@@ -66,7 +89,7 @@ The channel spec is `{button: i, field: 'value'|'touched'|'pressed'}` or `{axis:
 
 ## On the headset: debug panel + learn wizard
 
-Open the panel with Scene → "Finger debug", the wrist menu, or `?debug=1`. In VR it floats next to the board; on desktop it is also drawn in the page.
+Open the panel with System → "Finger debug" or `?debug=1`. In VR it floats next to the board; on desktop it is also drawn in the page.
 
 **What it shows, per hand:**
 - source kind, `inputSource.profiles`, target-ray mode;
@@ -120,6 +143,7 @@ This is how per-finger channels on an unknown controller (e.g. Steam Frame, if i
 
 ## Not done / limits
 
-- Hands have no collision with the body or the panels (the index-tip poke is a proximity test, not physics).
-- Hand-tracking wrist position is used directly. There is no filtering beyond the finger low-pass, and no "hand lost" prediction beyond the IK's 0.25 s blend to a relaxed arm.
+- The avatar's hands collide with its own body (`docs/IK.md`), shown with a ghost hand at the real pose. They do not collide with each other or with the panels; the index-tip poke is a proximity test, not physics.
+- There is no motion prediction for a lost hand. It is held, then relaxed.
+- **Thumb axes:** the thumb's nail side is the hand's dorsal axis tilted 60° toward the radial axis (`THUMB_AXIS` in `src/ik/rigdata.js`), so its flexion plane points across the palm. At the earlier 45°, a fist thumb stuck out below the fist like a thumbs-down (visual review). The fist thumb now lies across the index/middle middle phalanges (`tests/fingers2.test.mjs`). The 60° is chosen from the avatar rest hand, not measured on real XRHand data.
 - Thumb opposition from XRHand is approximated by pitch/yaw/bend1/bend2. Thumb-to-finger contact is not enforced, so a pinch can show a small gap.

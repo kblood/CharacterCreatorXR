@@ -1,7 +1,7 @@
 # Device notes
 
 **Nothing in this project has run on a real headset yet.** Everything marked "verified" below was verified either in
-public documentation (with the source) or in emulation (IWER in headless Chrome). Research date: 2026-09/10.
+public documentation (with the source) or in emulation (IWER in headless Chrome). Steam Frame sources re-checked 2026-10-01.
 
 Legend:
 - **Confirmed (source):** stated by the linked source.
@@ -10,45 +10,75 @@ Legend:
 
 ## Steam Frame (Valve)
 
-**Summary: Steam Frame behaviour of this page is completely unverified.** With the stock browser the page cannot even start an immersive session.
+**Summary: this page has not run on a Steam Frame.**
+- With the stock browser it cannot start an immersive session (no WebXR).
+- A community Chromium build does run WebXR there. That is the only known way to test today (recipe below).
+- Sources checked on **2026-10-01**. The date in each row is the date of the source.
 
-| Topic | Status | Notes / source |
+| Topic | Status | Notes / source (date) |
 |---|---|---|
-| Hardware | confirmed | Snapdragon 8 Gen 3, 16 GB, SteamOS (Arch); announced Nov 2025, reviewed Sep 2026. [Wikipedia](https://en.wikipedia.org/wiki/Steam_Frame), [Road to VR review](https://roadtovr.com/valve-steam-frame-review/) |
-| Browser | confirmed | Full Chrome/Chromium (Flathub) on the KDE desktop. The review says "There's seemingly no WebXR support yet." ([Road to VR](https://roadtovr.com/valve-steam-frame-review/)) |
-| Immersive WebXR in stock Chromium | confirmed **not available** | `navigator.xr` exists, but `isSessionSupported('immersive-vr')` is false ([saphid/chromium-webxr-steam-frame](https://github.com/saphid/chromium-webxr-steam-frame)). Upstream Chromium does not enable OpenXR on Linux ([device/vr README](https://chromium.googlesource.com/chromium/src/+/refs/tags/148.0.7778.96/device/vr/README.md)). This page then shows "VR not available" and runs the desktop fallback. |
-| Community WebXR build | exists, unofficial, **not tried** | [saphid/chromium-webxr-steam-frame](https://github.com/saphid/chromium-webxr-steam-frame): arm64 Chromium with in-progress Linux OpenXR CLs, running on the SteamVR OpenXR runtime. It launches with `--enable-features=OpenXR --disable-seccomp-filter-sandbox` (**reduced sandbox security**). The author reports squeeze/button state reaching pages. Trigger, thumbstick, left controller and hand tracking were not reported. |
-| Controller finger tracking | confirmed natively | Capacitive finger sensing exposed through SteamVR Skeletal Input. OpenXR interaction profile `/interaction_profiles/valve/frame_controller_valve`. [Steamworks: Steam Frame input](https://partner.steamgames.com/doc/steamhardware/steamframe/input) |
-| WebXR input profile | confirmed **missing** | There is no Steam Frame entry in the [WebXR input-profiles registry](https://github.com/immersive-web/webxr-input-profiles/tree/main/packages/registry/profiles), whose `valve` folder has only `valve-index`. There is none in Chromium's [OpenXR interaction profiles](https://chromium.googlesource.com/chromium/src/+/HEAD/device/vr/openxr/openxr_interaction_profiles.cc) either. |
-| What `inputSource.profiles` would report | **unverified** | Likely a SteamVR remap onto a profile Chromium knows (`oculus-touch*` or `valve-index`), not "steam-frame". |
-| Per-finger values in `gamepad.buttons/axes` | **unverified, unlikely** | Chromium's OpenXR mapping exposes trigger/squeeze/thumbstick/buttons; skeletal finger curls are not a WebXR gamepad concept. |
-| Controller-free hand tracking (XRHand) | confirmed **absent** at OS level (review); **unverified** in WebXR | Expect no `inputSource.hand` on the Frame. |
-| Eye tracking / foveation via WebXR | **unverified**, assume not | Natively available via OpenXR `XR_EXT_eye_gaze_interaction` / OpenVR ([Steamworks](https://partner.steamgames.com/doc/steamhardware/steamframe/input)). |
-| Frame rate, `local-floor`, dev workflow | **unverified** | No `adb reverse` equivalent is documented. Use HTTPS on the LAN (or an SSH tunnel to localhost if SSH is enabled on the device). |
+| Hardware | confirmed | Snapdragon 8 Gen 3, 16 GB, SteamOS. Refresh rates 72/80/90/120 Hz, with 144 Hz experimental. Eye-tracked foveated rendering (native). Greyscale passthrough, with an optional colour camera accessory. Released Sep 2026; the exact day differs between sources. [Wikipedia](https://en.wikipedia.org/wiki/Steam_Frame) (edited 2026-09-27) |
+| Stock browser | confirmed **no WebXR** | Chromium/Chrome on the desktop side: "There's seemingly no WebXR support yet." [Road to VR review](https://roadtovr.com/valve-steam-frame-review/) (2026-09-16). The page shows "VR not available" and runs the desktop fallback. |
+| Chromium upstream | confirmed, **not shipped by default** | [CL 8132979](https://chromium-review.googlesource.com/c/chromium/src/+/8132979) "vr: enable the OpenXR runtime on Linux" merged 2026-09-29. The feature stays **off by default** (`--enable-features=OpenXR`). The sandbox CL 8441736 merged 2026-09-26 (stated in the same review thread). `kOpenXR` is on by default only on Windows (`device/vr/public/cpp/features.cc`, main, 2026-10-01). The device/vr README on main is stale. **Unknown:** which Chrome release first ships it, and when it is enabled by default. |
+| Community WebXR build | confirmed by its author, **not tried by us** | [saphid/chromium-webxr-steam-frame](https://github.com/saphid/chromium-webxr-steam-frame) README and technical notes (2026-09-26/27). Chromium 156.0.8071.0 arm64 on SteamOS 0.3.0 with SteamVR 2.17.10. `isSessionSupported('immersive-vr')` is true, and three.js runs at 72 fps. Launch flags: `--enable-features=OpenXR --disable-seccomp-filter-sandbox --password-store=basic` (the second flag **reduces sandbox security**). The README still calls the OpenXR CL "in review"; it has since merged (row above). |
+| Haptics in that build | confirmed **missing** (author) | `gamepad.hapticActuators` is empty. Our haptic pulses are no-ops there. Sound clicks (System > Sound) are the feedback. |
+| `inputSource.profiles` in that build | confirmed (author, right controller) | `["oculus-touch", "generic-trigger-squeeze-thumbstick"]`, mapping `xr-standard`. The **left** controller was not reported (**unverified**). |
+| Controller "hand" in that build | confirmed (author) | Requesting `hand-tracking` shows a permission prompt. After that, the controller exposes a controller-derived 25-joint `inputSource.hand` (SteamVR skeletal input, not a camera-tracked hand). **Bare-hand tracking was not covered (unverified).** |
+| Native finger tracking | confirmed (native only) | Capacitive finger sensing through SteamVR Skeletal Input. OpenXR profile `/interaction_profiles/valve/frame_controller_valve` (`XR_VALVE_frame_controller_interaction`). [Steamworks: Steam Frame input](https://partner.steamgames.com/doc/steamhardware/steamframe/input) |
+| WebXR input profile for the Frame | confirmed **missing** | The [input-profiles registry](https://github.com/immersive-web/webxr-input-profiles/tree/main/packages/registry/profiles) `valve` folder still has only `valve-index`. Chromium has no `frame_controller_valve` mapping, so the controllers appear as Oculus Touch (row above). |
+| Eye tracking / foveation / immersive-ar via WebXR | **not found**, assume absent | Native eye tracking exists (OpenXR / OpenVR). No WebXR exposure was found in the community build's notes. |
+| PC route (Frame as a PC VR headset) | pairing confirmed; **WebXR unverified** | A USB-3 adapter plus SteamVR pairing is documented ([Steamworks: Steam Frame setup](https://partner.steamgames.com/doc/steamhardware/steamframe/setup)). That desktop Chrome on Windows reaches it through WebXR/OpenXR is **unverified**. A `--disable-features=XRSandbox` hint was seen only in a search snippet. |
+| Developer mode | confirmed | Steam Settings > System > Enable Developer Mode, then Developer > Set User Password (enables SSH/ADB/RDP). [Steamworks: Steam Frame setup](https://partner.steamgames.com/doc/steamhardware/steamframe/setup) |
+| HTTPS to a LAN dev server | **nothing found** | WebXR needs a secure context. Use an HTTPS host, or an SSH tunnel so the page is `http://localhost` on the device. |
+
+### How to test on a Steam Frame today (community build; nothing here is tested by us)
+
+Use the deployed HTTPS URL, or a LAN server through an SSH tunnel.
+
+1. **Developer mode:** turn it on and set a user password (row above). This enables SSH.
+2. **Build:** on a Linux PC, build the community Chromium with `build/build.sh` from [saphid/chromium-webxr-steam-frame](https://github.com/saphid/chromium-webxr-steam-frame). The author states about 90 GB of disk and hours of build time.
+3. **Install:** copy the result to the Frame (`scp`) and run `frame/install.sh` there. Launch it from the Steam library.
+4. **Debug:** `chromium-xr --remote-debugging-port=9223` listens on loopback only. Reach it from the PC through `ssh -L 9223:localhost:9223`.
+5. **Testing off-head:** the author's `vrcmd` settings keep the compositor running: `power.pauseCompositorOnStandby 0`, `turnOffScreensTimeout 3600`, and `--handlewakeup`.
+6. **In the page:**
+   1. Open System > Browser and headset. It lists `enabledFeatures`, the reference space, frame rates, foveation, and each input source's profiles, hand and haptics.
+   2. Open the finger debug panel (System > Finger debug).
+   3. Press **Save diagnostics** and send the JSON back.
+   4. If a per-finger channel moves in the live bars, use **Learn L/R**.
+7. **Expected, from the author's notes (unverified by us):**
+   - Controllers report as `oculus-touch`.
+   - Haptics do nothing.
+   - With hand tracking allowed, a controller-derived hand drives the fingers through the XRHand path.
 
 ### What the page does about it (no Frame-specific code paths)
 
 **Session setup:**
 - Every feature is requested as **optional**: `local-floor`, `bounded-floor`, `hand-tracking`, `layers`.
 - The reference space falls back: `local-floor` → `bounded-floor` → `local`.
-- `enabledFeatures`, the reference space, frame rates and foveation are shown in the status line and in the diagnostics JSON.
+- The runtime page (System > Browser and headset) and the diagnostics JSON show:
+  - `enabledFeatures`, the reference space and the blend mode;
+  - the frame rates and foveation;
+  - for each input source: profiles, hand, gamepad layout and haptic actuators.
+  - Source: `src/features.js`.
 
 **Input is handled by capability, not by device name:**
-- `inputSource.hand` → hand path.
+- `inputSource.hand` → hand path. This covers the community build's controller-derived hand.
 - A matching table profile with channels → per-finger gamepad path.
-- Otherwise trigger/grip/thumb-touch.
+- Otherwise trigger/grip/thumb-touch. An `oculus-touch` profile on a Frame takes this path.
 
 **Placeholder table entry:**
 - `valve-frame-placeholder` in `src/input/finger_profiles.json` matches guessed profile ids.
 - It has **no channels**, so a Frame would use the fallback until someone maps it.
 
-**Mapping a real Frame (if a WebXR browser ever runs there):**
-1. Open the **finger debug panel**.
-2. Look at the live button/axis values.
-3. Use **Learn L/R** to map any per-finger channels. The mapping is stored on the headset.
-4. **Save diagnostics** and send the JSON back so the shipped table can be updated.
+**Haptics:** sent only when an actuator exists, and they can be switched off (System > Haptics). The WebAudio click is independent of haptics.
 
-**Status strings:** the UA test for "mobile XR" (default quality `medium`) includes `SteamOS` and `Linux; Android`. The Reset tab and the debug panel show "Steam Frame: not verified on hardware".
+**Quality:**
+- The UA test for standalone browsers (starting preset `medium`) includes `SteamOS`.
+- Whether the community build's UA contains it is **unverified**.
+- The GPU pattern also accepts Mesa's `FDnnn` renderer names.
+- In any case the in-session auto-scaler reacts to the measured frame period.
+
+**Status strings:** the System tab and the debug panel show "Steam Frame: not verified on hardware".
 
 ## Meta Quest (Quest Browser)
 
@@ -75,33 +105,46 @@ Legend:
 - Hand poses come from IWER's built-in `default`/`pinch`/`point`, plus `open`/`fist`/`hook` generated by `src/dev/handposes.js`. These are clean synthetic poses without tracking noise.
 - The gamepad-finger device is a **fake** `test-finger-controller` with 4 extra analog buttons and 1 axis. It does not represent any real controller.
 
-**Last full run:** `npm run shots` gave **25/25** checks and 57 screenshots.
+**Last full run:** `npm run shots`, 38/38 checks passed and 88 screenshots (`build/shots/report.json`).
 
 ### Headless performance (NOT representative of any headset)
 
 These are CPU-side milliseconds per frame, measured over 4 s each in headless Chrome on a desktop.
-- The loop is capped at about 60 Hz by the headless compositor.
-- GPU time is not measured.
-- A Quest's mobile GPU/CPU will be several times slower.
+- The loop runs at about 60-80 Hz, set by the headless compositor.
+- GPU time is not measured (WebXR offers no GPU timer; the in-VR perf HUD also shows CPU times only).
+- A standalone headset's mobile GPU/CPU will be several times slower.
 - The numbers only show relative costs.
+
+Draw calls and triangles grew from round 1 (32 calls / 47.7 k) because the scene now has a shadow pass, blob shadows, a sky dome and underwear layers.
 
 | Scenario | frame | IK | mirror | render (submit) | cloth | draw calls | triangles |
 |---|---|---|---|---|---|---|---|
-| mirror on (medium: stereo 768 px) | 2.09 ms | 0.23 | 1.20 | 0.51 | 0.05 | 32 | 47.7 k |
-| mirror off | 1.00 ms | 0.21 | 0.02 | 0.61 | 0.05 | 30 | 47.7 k |
-| mirror low (mono 512 px, every 2nd frame) | 1.35 ms | 0.20 | 0.43 | 0.57 | 0.05 | 32 | 47.7 k |
+| mirror on (medium: stereo 768 px) | 3.12 ms | 0.22 | 1.83 | 0.68 | 0.07 | 116 | 128.8 k |
+| mirror off | 1.61 ms | 0.22 | 0.03 | 0.94 | 0.08 | 46 | 49.7 k |
+| mirror low (mono 512 px, every 2nd frame) | 2.07 ms | 0.20 | 0.61 | 0.85 | 0.08 | 82 | 89.3 k |
 
 - **Mirror cost:** one extra scene render per eye per frame (stereo), or one mono render every other frame (`low`).
   - On a headset, expect the mirror to roughly double the GPU scene cost when the avatar fills it.
-  - The render target is 768×~1000 per eye on `medium`, 1024 with 4× MSAA on `high`.
+  - That is why the auto-scaler steps the mirror down first.
 - **Cloth** runs in a worker; the main-thread cost shown is only applying results.
+- **IK alone** (`npm run bench`, node): 0.026 ms and about 4.6 KB of heap per solve. Round 1 measured 0.053-0.092 ms and about 153 KB.
 
-**Presets** (`src/main.js`; auto → `medium` on mobile-XR user agents):
+**Presets** (`src/quality.js`; the starting preset is picked from the UA, the GPU string and a short GPU benchmark at load: 8 full-screen passes of a fixed shader into a 512 px target, timed with a pixel read-back, median of 3 runs):
 
-| Preset | framebuffer scale | foveation | mirror | shadows |
-|---|---|---|---|---|
-| high | 1.0 | 0.3 | stereo 1024, MSAA 4 | 1024 |
-| medium | 0.9 | 0.6 | stereo 768 | 512 |
-| low | 0.8 | 1.0 | mono 512, every 2nd frame | off |
+| Preset | framebuffer scale | foveation | mirror | shadows | cloth |
+|---|---|---|---|---|---|
+| high | 1.0 | 0.3 | stereo 1024, MSAA 4 | 1024 | every frame |
+| medium | 0.9 | 0.6 | stereo 768 | 512 | every frame |
+| low | 0.8 | 1.0 | mono 512, every 2nd frame | off | every 2nd frame |
 
-Unverified: that `medium` holds 72 Hz on a Quest 3 with the mirror on. If it does not, `low` or mirror off is the fallback.
+**In-session auto-scaler** (Scene > Auto-adjust, on by default):
+- It compares the measured frame period with the session's target rate (72/90 Hz).
+- **Down** one level after 1.5 s averaging more than 1.12 × the target period.
+- **Up** after 10 s under 1.03 ×, with a 4 s cooldown between changes.
+- The levels change only what can change while presenting: mirror quality, foveation, shadows, cloth rate.
+- The framebuffer scale needs a new session (Scene > Resolution).
+
+**Unverified:**
+- whether `medium` holds 72 Hz on a Quest 3 with the mirror on;
+- what the auto-scaler settles on there;
+- the Steam Frame community build's performance with this page (its author reports 72 fps for a three.js scene, not for this page).

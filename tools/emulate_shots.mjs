@@ -34,6 +34,17 @@ const SCENARIOS = {
     }),
   },
 };
+// arms crossed over the chest (each hand at the opposite shoulder), sitting on a (virtual) chair, a tracked jump
+const SCENARIOS2 = {
+  acrossChest: hold({ head: { pos: [0, 1.6, 0.4], ypr: [0, -10, 0] }, left: { pos: [0.13, 1.36, 0.3], ypr: [-80, 0, 0] }, right: { pos: [-0.13, 1.33, 0.3], ypr: [80, 0, 0] } }, 1.4),
+  sit: { duration: 4.2, keys: [{ t: 0, head: HEAD, ...REST }, { t: 1.2, head: { pos: [0, 1.18, 0.56], ypr: [0, -4, 0] }, left: { pos: [-0.16, 0.7, 0.3], ypr: [0, -30, 0] }, right: { pos: [0.16, 0.7, 0.3], ypr: [0, -30, 0] } }, { t: 4.2, head: { pos: [0, 1.18, 0.56], ypr: [0, -4, 0] }, left: { pos: [-0.16, 0.7, 0.3], ypr: [0, -30, 0] }, right: { pos: [0.16, 0.7, 0.3], ypr: [0, -30, 0] } }] },
+  jump: { duration: 1.6, keys: [{ t: 0, head: HEAD, ...REST }, { t: 0.3, head: HEAD, ...REST }, { t: 0.42, head: { pos: [0, 1.5, 0.4], ypr: [0, -6, 0] }, ...REST },
+    { t: 0.58, head: { pos: [0, 1.82, 0.4], ypr: [0, -6, 0] }, left: { pos: [-0.25, 1.2, 0.44], ypr: [0, -25, 0] }, right: { pos: [0.25, 1.2, 0.44], ypr: [0, -25, 0] } },
+    { t: 0.74, head: { pos: [0, 1.6, 0.4], ypr: [0, -6, 0] }, ...REST }, { t: 0.86, head: { pos: [0, 1.54, 0.4], ypr: [0, -6, 0] }, ...REST }, { t: 1.6, head: HEAD, ...REST }] },
+  // the right hand pushed into the chest: the avatar's hand stops at the body, the ghost hand shows the real one
+  ghost: hold({ head: { pos: [0, 1.6, 0.4], ypr: [0, -20, 0] }, left: REST.left, right: { pos: [0.02, 1.3, 0.47], ypr: [0, 0, 0] } }, 1.2),
+  tpose: hold({ head: { pos: [0, 1.6, 0.4], ypr: [0, 0, 0] }, left: { pos: [-0.8, 1.42, 0.42], ypr: [90, 0, 0] }, right: { pos: [0.8, 1.42, 0.42], ypr: [-90, 0, 0] } }, 5.6),
+};
 const HANDS_FRONT = { head: { pos: [0, 1.6, 0.4], ypr: [0, -18, 0] }, left: { pos: [-0.1, 1.4, 0.08], ypr: [0, 0, 0] }, right: { pos: [0.1, 1.4, 0.08], ypr: [0, 0, 0] } };
 
 const report = { note: 'EMULATED with IWER in headless Chrome - not a real headset. Frame times here say nothing about Quest / Steam Frame GPU cost.', started: new Date().toISOString(), scenarios: {}, checks: [], shots: [], errors: [] };
@@ -78,16 +89,16 @@ const summary = st => ({ lean: +(st.debug?.lean ?? 0).toFixed(3), crouch: +(st.d
   reach: Object.fromEntries(['left', 'right'].map(s => [s, { reach: +(st.debug?.arms?.[s]?.reach ?? 0).toFixed(3), clamped: st.debug?.arms?.[s]?.clamped }])),
   fingers: Object.fromEntries(['left', 'right'].map(s => [s, { kind: st.fingers?.[s]?.kind, profile: st.fingers?.[s]?.profile, curls: st.fingers?.[s]?.curls, paths: st.fingers?.[s]?.paths }])) });
 
-async function thirdPerson(browser, base, captures) {
+async function thirdPerson(browser, base, captures, query = '?shot=1&view=third&outfit=tshirt,jeans,shoes') {
   // replays captured tracking records on a desktop page with a third-person camera (same IK, same finger layer)
-  const page = await newPage(browser, `${base}?shot=1&view=third&outfit=tshirt,jeans,shoes`);
+  const page = await newPage(browser, `${base}${query}`);
   for (const { name, rec, cam, fixture, times, extra } of captures) {
     await page.evaluate(({ rec, cam, fixture, extra }) => {
       const app = window.__app;
       if (extra) extra.split(';').filter(Boolean).forEach(x => new Function('app', x)(app));
       window.__xr.setReplay(fixture || null, 0);
       window.__xr.setManual({
-        frozen: true, thirdPerson: true,
+        frozen: true, thirdPerson: true, ghosts: !!cam?.ghosts,
         record: fixture ? null : (() => rec),
         camera(c) {
           const av = app.avatar.root.position, s = app.scale || 1;
@@ -120,7 +131,7 @@ async function main() {
   const CAM_FRONT = { off: [1.1, 0.25, -1.55], ty: 1.0 }, CAM_SIDE = { off: [2.0, 0.2, -0.35], ty: 0.9 };
   try {
     // ---------------- body scenarios with controllers ----------------
-    if (['standing', 'armsUp', 'reach', 'crouch', 'deepCrouch', 'walk', 'mirror', 'perf'].some(want)) {
+    if (['standing', 'armsUp', 'reach', 'crouch', 'deepCrouch', 'walk', 'mirror', 'perf', 'poses', 'calib', 'vrextras'].some(want)) {
       const page = await newPage(browser, `${base}?emulate=quest3&shot=1&outfit=tshirt,jeans,shoes`);
       await enterXR(page);
       const info = await page.evaluate(() => {
@@ -149,7 +160,14 @@ async function main() {
           const cal = await page.evaluate(() => { const r = window.__app.calibrate(1.6); return { r, eye: window.__app.avatar.eyeHeightFor(window.__app.avatar.values.height) * (window.__app.scale || 1) }; });
           report.calibration = cal;
           check('calibration: avatar eye height matches the user (1.60 m)', cal.r?.ok && Math.abs(cal.eye - 1.6) < 0.02, cal);
+          // calibrating re-seeds the solver: no jump / walk from the scale step
+          const calIk = await page.evaluate(() => ({ air: window.__app.ik.state.air, steps: window.__app.ik.state.loco.steps }));
           await play(page, hold({ head: HEAD, ...REST }, 0.8));
+          const calIk2 = await page.evaluate(() => ({ air: window.__app.ik.state.air, steps: window.__app.ik.state.loco.steps, aw: window.__app.ik.state.aw }));
+          check('calibration step: no jump, no steps (solver re-seeded)', calIk.air === 'ground' && calIk2.air === 'ground' && calIk2.aw === 0 && calIk2.steps - calIk.steps <= 1, { calIk, calIk2 });
+          // 'own' mode scales the XR joints too (hand-debug skeleton)
+          const sr = await page.evaluate(() => window.__xr.scaleRecord({ head: { pos: [0, 1, 0] }, hands: {}, snaps: [{ joints: { wrist: [1, 2, 3] } }] }, 2).snaps[0].joints.wrist);
+          check('own-mode scaleRecord scales the XR hand joints', sr.join() === '2,4,6', sr);
         }
       }
       const std = report.scenarios.standing, up = report.scenarios.armsUp, cr = report.scenarios.crouch, dc = report.scenarios.deepCrouch, wk = report.scenarios.walk;
@@ -190,6 +208,76 @@ async function main() {
         report.perf = perf;
         await page.evaluate(() => { window.__app.mirror.setQuality(window.__app.preset.mirror); window.__app.mirror.setEnabled(true); });
         console.log('perf (headless, NOT representative):', JSON.stringify(perf));
+      }
+      // ---- arms across the chest, sit, jump, ghost hand ----
+      if (want('poses')) {
+        await play(page, SCENARIOS2.acrossChest); await sleep(300);
+        let st = await state(page);
+        report.scenarios.acrossChest = { reach: summary(st).reach, drift: { left: st.debug.arms.left.drift, right: st.debug.arms.right.drift } };
+        await eyes(page, 'across_chest');
+        captures.push({ name: 'across_chest', rec: await grabRec(page), cam: CAM_FRONT });
+        await play(page, SCENARIOS2.sit); await sleep(300);
+        st = await state(page);
+        report.scenarios.sit = { sit: st.debug.sit, lean: st.debug.lean };
+        check('sit: low, still, level gaze, head back -> sitting', st.debug.sit > 0.8, { sit: st.debug.sit });
+        captures.push({ name: 'sit', rec: await grabRec(page), cam: { off: [1.6, 0.2, -1.0], ty: 0.7 } });
+        await play(page, hold({ head: HEAD, ...REST }, 1.2));
+        await page.evaluate(() => { window.__airLog = []; window.__airIv = setInterval(() => window.__airLog.push(window.__xr.state().debug?.loco?.air), 16); window.__app.recorder.start(); });
+        await play(page, SCENARIOS2.jump); await sleep(200);
+        const jump = await page.evaluate(() => { clearInterval(window.__airIv); const r = window.__app.recorder; r.stop(); return { air: [...new Set(window.__airLog)], fx: r.fixture('jump (IWER emulated)') }; });
+        report.scenarios.jump = { phases: jump.air };
+        check('jump: jump -> fall -> land detected from the head', ['jump', 'fall', 'land'].every(p => jump.air.includes(p)), jump.air);
+        captures.push({ name: 'jump', fixture: jump.fx, cam: CAM_FRONT, times: [0.62, 0.74] });
+        await play(page, SCENARIOS2.ghost); await sleep(200);
+        st = await state(page);
+        report.scenarios.ghost = { drift: st.debug.arms.right.drift, shown: st.ghosts };
+        check('ghost hand: shown when the avatar hand is blocked by the body', st.ghosts.right && st.debug.arms.right.drift > 0.03, { drift: st.debug.arms.right.drift, shown: st.ghosts });
+        await eyes(page, 'ghost_hand');
+        captures.push({ name: 'ghost_hand', rec: await grabRec(page), cam: { off: [0.9, 0.15, -0.9], ty: 1.25, fov: 45, ghosts: true } });
+        await play(page, hold({ head: HEAD, ...REST }, 0.6));
+      }
+      // ---- in-VR T-pose calibration (countdown + sampling), then the 'own' scale mode ----
+      if (want('calib')) {
+        await page.evaluate(() => { window.__app.resetCalibration(); window.__app.startCalibration(); });
+        await play(page, hold({ head: { pos: [0, 1.6, 0.4], ypr: [0, -4, 0] }, ...REST }, 1.0));
+        await eyes(page, 'calib_countdown');
+        await play(page, SCENARIOS2.tpose); await sleep(200);
+        let st = await state(page);
+        // the span is wrist to wrist (the tracking layer moves the controller grip back to the wrist)
+        const wristSpan = await page.evaluate(() => { const h = window.__app.rawRec.hands; return Math.hypot(h.left.pos[0] - h.right.pos[0], h.left.pos[1] - h.right.pos[1], h.left.pos[2] - h.right.pos[2]); });
+        report.scenarios.calibration = { flow: st.calibFlow, calibration: st.calibration, wristSpan };
+        check('T-pose calibration: done, eye 1.60 m, wrist span measured', st.calibFlow.phase === 'done' && Math.abs(st.calibration.userEye - 1.6) < 0.02 && Math.abs((st.calibration.span ?? 0) - wristSpan) < 0.02, { flow: st.calibFlow.phase, eye: st.calibration.userEye, span: st.calibration.span, wristSpan: +wristSpan.toFixed(3), armScale: st.calibration.armScale });
+        await page.evaluate(() => { window.__app.setCalibrationMode('own'); window.__app.calibrate(1.5); });
+        await play(page, hold({ head: { pos: [0, 1.5, 0.4], ypr: [0, -6, 0] }, left: { pos: [-0.2, 0.88, 0.44], ypr: [0, -25, 0] }, right: { pos: [0.2, 0.88, 0.44], ypr: [0, -25, 0] } }, 1.0));
+        st = await state(page);
+        const own = await page.evaluate(() => { const a = window.__app, V = a.camera.position.constructor; const hw = a.avatar.headWorld(new V()); const cam = a.renderer.xr.getCamera().getWorldPosition(new V()); return { head: hw.toArray(), xrCam: cam.toArray(), avatarEye: a.avatar.eyeHeightFor(a.avatar.values.height) }; });
+        report.scenarios.ownScale = { worldScale: st.worldScale, userRigScale: st.userRigScale, ...own };
+        check("'own' scale: the user's world is scaled to the avatar's eye height (camera at the avatar's eyes)", Math.abs(st.userRigScale - st.worldScale) < 1e-6 && Math.abs(own.xrCam[1] - own.avatarEye) < 0.03, { worldScale: st.worldScale, camY: own.xrCam[1], avatarEye: own.avatarEye });
+        await eyes(page, 'own_scale');
+        await page.evaluate(() => { window.__app.setCalibrationMode('morph'); window.__app.calibrate(1.6); });
+        await play(page, hold({ head: HEAD, ...REST }, 0.6));
+      }
+      // ---- perf HUD + tutorial overlay + floor reflection, photo, session restart ----
+      if (want('vrextras')) {
+        await page.evaluate(() => { const a = window.__app; a.settings.values.perfHud = true; a.ui.hud.setVisible(true); a.ui.showTutorial(true); a.floorMirror.setEnabled(true); });
+        await play(page, hold({ head: { pos: [0, 1.6, 0.4], ypr: [0, -12, 0] }, ...REST }, 1.0)); await sleep(300);
+        await eyes(page, 'tutorial_hud_floor');
+        let st = await state(page);
+        check('floor reflection renders per eye', st.floorMirror.enabled && st.floorMirror.renders > 10, st.floorMirror);
+        await page.evaluate(() => { const a = window.__app; a.ui.tutorial.setVisible(false); a.ui.hud.setVisible(false); a.floorMirror.setEnabled(false); });
+        const photo = await page.evaluate(() => window.__app.photo.take({ framing: 'full', width: 960, height: 1200 }).toDataURL('image/png'));
+        await writeFile(join(OUT, 'photo_full.png'), Buffer.from(photo.split(',')[1], 'base64')); report.shots.push('build/shots/photo_full.png');
+        const portrait = await page.evaluate(() => window.__app.photo.take({ framing: 'portrait', width: 960, height: 1200 }).toDataURL('image/png'));
+        await writeFile(join(OUT, 'photo_portrait.png'), Buffer.from(portrait.split(',')[1], 'base64')); report.shots.push('build/shots/photo_portrait.png');
+        // session end -> restart: no stale state, the user rig back to scale 1, presenting again
+        await page.evaluate(() => window.__xr.enterVR());
+        await page.waitForFunction('window.__xr.state().presenting === false', { timeout: 10000 });
+        st = await state(page);
+        const ended = { mode: st.mode, userRigScale: st.userRigScale };
+        await enterXR(page);
+        await play(page, hold({ head: HEAD, ...REST }, 0.8));
+        st = await state(page);
+        check('session end + restart: desktop between, presenting again, finite pose', ended.mode === 'desktop' && ended.userRigScale === 1 && st.presenting && st.lifecycle.sessions >= 2 && Number.isFinite(st.debug?.lean), { ended, sessions: st.lifecycle.sessions, events: st.lifecycle.events.map(e => `${e.kind}:${e.detail}`) });
       }
       await closePage(page, 'controllers');
     }
@@ -369,7 +457,7 @@ async function main() {
         window.__xr.setManual({ camera(c) { const p = b.group.position, q = b.group.quaternion; const n = new (p.constructor)(0, 0, 1).applyQuaternion(q); c.position.copy(p).addScaledVector(n, 0.95); c.quaternion.copy(q); } });
       });
       await sleep(500);
-      for (const tb of ['clothes', 'body', 'hair', 'scene', 'reset']) {
+      for (const tb of ['clothes', 'body', 'hair', 'outfits', 'calib', 'scene', 'system']) {
         // click the tab with the real mouse (capture-phase handler on the canvas)
         const pt = await page.evaluate(id => {
           const app = window.__app, b = app.ui.board, w = b.widgets.find(x => x.id === id);
@@ -384,13 +472,42 @@ async function main() {
         await shot(page, `ui_board_${tb}`);
       }
       check('desktop: mouse clicks switch all tabs', !report.checks.some(c => c.name.startsWith('desktop mouse click') && !c.ok));
+      // thumbnails rendered offscreen for the clothes grid
+      await page.evaluate(() => window.__app.ui.setTab('clothes', 'top')); await sleep(1500);
+      const th = await page.evaluate(() => window.__xr.state().thumbs);
+      check('clothes grid: garment thumbnails rendered offscreen (cached)', th.rendered >= 3 && th.failed === 0, th);
+      // the JSON export/import round trip restores the character
+      const io = await page.evaluate(async () => {
+        const a = window.__app, ch = a.snapshotCharacter('t');
+        const text = JSON.stringify(ch);
+        a.avatar.setSlider('weight', -0.8); await a.avatar.clothing.setOutfit(['tshirt']);
+        const r = await a.importCharacterText(text);
+        return { ok: r.ok, kind: ch.kind, version: ch.version, weight: a.avatar.values.weight, outfit: a.avatar.clothing.state().outfit, before: ch.outfit };
+      });
+      check('character JSON export/import round trip restores body + outfit', io.ok && io.kind === 'ccxr-character' && io.version === 1 && Math.abs(io.weight - 0) < 1e-6 && JSON.stringify(io.outfit) === JSON.stringify(io.before), io);
       await closePage(page, 'desktop-ui');
+      // English + female: body/breast page, bra slot, hair grid, runtime page
+      const p2 = await newPage(browser, `${base}?shot=1&sex=female&lang=en&outfit=tshirt,skirt,shoes`);
+      await p2.evaluate(() => {
+        const app = window.__app, b = app.ui.board;
+        window.__xr.setManual({ camera(c) { const p = b.group.position, q = b.group.quaternion; const n = new (p.constructor)(0, 0, 1).applyQuaternion(q); c.position.copy(p).addScaledVector(n, 0.95); c.quaternion.copy(q); } });
+      });
+      for (const [tb, pg] of [['body', 'breast'], ['clothes', 'bra'], ['hair'], ['outfits'], ['system', 'runtime']]) {
+        await p2.evaluate((a, b) => window.__app.ui.setTab(a, b), tb, pg); await sleep(tb === 'hair' ? 2500 : 600);
+        await shot(p2, `ui_en_female_${tb}${pg ? `_${pg}` : ''}`);
+      }
+      const fem = await p2.evaluate(() => { const s = window.__xr.state(); return { sex: s.sex, breast: s.breast?.enabled, outfit: s.outfit, ikBody: s.ikBody }; });
+      check('female: underwear (panties + bra) worn, breast physics on, IK torso uses the female profile', fem.sex === 'female' && fem.breast && fem.outfit.includes('panties') && fem.outfit.includes('bra') && fem.ikBody?.male === 0, fem);
+      // the breast size slider deepens the IK torso (hand-body collision); the default size is the measured profile (bust 0)
+      const bust = await p2.evaluate(() => { const a = window.__app.avatar; const v0 = a.values.breastSize; a.setSlider('breastSize', 1); window.__app.syncIKBody(); const b = window.__xr.state().ikBody.bust; a.setSlider('breastSize', v0); window.__app.syncIKBody(); return { atMax: b, back: window.__xr.state().ikBody.bust }; });
+      check('female: breast size slider -> deeper IK torso, and back', bust.atMax > 0.02 && Math.abs(bust.back) < 1e-6, bust);
+      await closePage(p2, 'desktop-ui-en');
     }
 
     // ---------------- cloth: skirt + coat, wind, walking replay ----------------
     if (want('cloth')) {
       const walk = captures.find(c => c.name === 'walk')?.fixture;
-      captures.push({ name: 'cloth_wind', rec: null, fixture: walk || null, cam: { off: [1.6, 0.15, -1.2], ty: 0.9 }, times: walk ? [1.2, 2.2] : null,
+      captures.push({ name: 'cloth_wind', rec: null, fixture: walk || null, cam: { off: [2.3, 0.2, -1.7], ty: 1.0 }, times: walk ? [1.2, 2.2] : null,
         extra: "app.avatar.clothing.setOutfit(['skirt','trenchcoat','shoes']);app.avatar.cloth?.setWind(0.8);" });
     }
 
@@ -399,6 +516,9 @@ async function main() {
       const needRec = captures.filter(c => c.rec || c.fixture);
       for (const c of captures) if (!c.rec && !c.fixture) c.rec = captures.find(x => x.rec)?.rec;
       await thirdPerson(browser, base, needRec.length ? captures.filter(c => c.rec || c.fixture) : []);
+      // the same records on a female avatar (breasts + physics, default underwear coverage, skirt cloth)
+      const fem = captures.filter(c => ['standing', 'walk', 'jump', 'across_chest'].includes(c.name) && (c.rec || c.fixture)).map(c => ({ ...c, name: `female_${c.name}` }));
+      if (fem.length) await thirdPerson(browser, base, fem, '?shot=1&view=third&sex=female&outfit=tshirt,skirt,shoes');
     }
   } catch (e) {
     console.error(e); report.errors.push({ fatal: String(e?.stack || e) });

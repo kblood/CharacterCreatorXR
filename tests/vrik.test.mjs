@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createVRIK } from '../src/ik/vrik.js';
+import { insideTorso } from '../src/ik/bodyvolume.js';
 import { fingerStateFromCurls } from '../src/ik/fingers.js';
 import { RIG, viewer, handQ, worldJoints, dist, DEG, allFinite, rng } from './helpers.mjs';
 
@@ -57,9 +58,8 @@ test('elbows never go through the torso; knees point forward', () => {
     const r = ik.solve({ head: viewer([0, 1.55, 0]), hands }, 1 / 72);
     const P = r.positions;   // yaw frame (character frame + translation)
     for (const s of ['left', 'right']) {
-      const e = P[`${s}LowerArm`], c = P.upperChest;
-      const x = e[0] - c[0], z = e[2] - c[2], y = e[1] - c[1];
-      if (y < 0.1 && y > -0.43 && r.debug.arms[s].reach < 0.98) assert.ok((x / 0.14) ** 2 + ((z + 0.01) / 0.11) ** 2 >= 1, `${s} elbow inside the torso: ${e} chest ${c} target ${r.debug.arms[s].target} reach ${r.debug.arms[s].reach}`);
+      // the measured torso profile (src/ik/bodyvolume.js) inflated by 3 cm (the solver keeps 4 cm)
+      if (r.debug.arms[s].reach < 0.98) assert.ok(!insideTorso(ik.state.torso, RIG.H, r.world, P, P[`${s}LowerArm`], 0.03), `${s} elbow inside the torso: ${P[`${s}LowerArm`]} target ${r.debug.arms[s].target}`);
     }
     for (const s of ['left', 'right']) {
       const k = P[`${s}LowerLeg`], hip = P[`${s}UpperLeg`], ft = P[`${s}Foot`];
@@ -111,8 +111,8 @@ test('crouch: pelvis goes down, knees bend, feet stay on the floor', () => {
   assert.ok(J.hips[1] >= RIG.minPelvisY - 1e-6);
 });
 
-test('walking: feet take alternating steps and keep up with the body', () => {
-  const ik = createVRIK(RIG);
+test('walking without clips (procedural steps): feet take alternating steps and keep up with the body', () => {
+  const ik = createVRIK(RIG, { clips: false });
   settle(ik, { head: viewer([0, 1.55, 0]), hands: STAND });
   let lastSteps = ik.state.loco.steps, maxLag = 0, r;
   for (let i = 0; i < 72 * 4; i++) {

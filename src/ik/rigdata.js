@@ -25,11 +25,17 @@ export function handFrame(side, wrist, indexKnuckle, middleKnuckle, littleKnuckl
   return { F, R, D, q: qFrameZY(F, D) };
 }
 
-/** Reference axes of a finger: the thumb's "dorsal" is its nail side, halfway between the hand's D and R. */
+/** Thumb nail-side tilt from the hand's dorsal axis D toward its radial axis R (rad); see fingerAxes. */
+// 60 deg: the thumb is pronated relative to the fingers, so its flexion plane points across the palm (toward the
+// little finger), not straight into it. At 45 deg a fist thumb stuck out below the fist like a thumbs-down (visual
+// review, hands_fist_3p.png); 60 deg lets it wrap across the index / middle middle phalanges (tests/fingers.test).
+export const THUMB_AXIS = { tilt: Math.PI / 3 };
+/** Reference axes of a finger: the thumb's "dorsal" is its nail side, tilted from the hand's D toward R. */
 export function fingerAxes(finger, hf) {
   if (finger !== 'Thumb') return { F: hf.F, D: hf.D, R: hf.R };
-  const Dt = vNorm([hf.D[0] + hf.R[0], hf.D[1] + hf.R[1], hf.D[2] + hf.R[2]]);
-  const Rt = vNorm(vReject([hf.R[0] - hf.D[0], hf.R[1] - hf.D[1], hf.R[2] - hf.D[2]], Dt));
+  const c = Math.cos(THUMB_AXIS.tilt), s = Math.sin(THUMB_AXIS.tilt);
+  const Dt = vNorm([hf.D[0] * c + hf.R[0] * s, hf.D[1] * c + hf.R[1] * s, hf.D[2] * c + hf.R[2] * s]);
+  const Rt = vNorm(vReject([hf.R[0] * c - hf.D[0] * s, hf.R[1] * c - hf.D[1] * s, hf.R[2] * c - hf.D[2] * s], Dt));
   return { F: hf.F, D: Dt, R: Rt };
 }
 
@@ -81,9 +87,13 @@ export function prepareRig(heads, { eyeOffset = null } = {}) {
   const headH = H.head[1];
   const eo = eyeOffset ?? [0, 0.038 * headH / 1.515, 0.078 * headH / 1.515];
   const torsoLen = vLen(vSub(H.head, H.hips));
+  // head volume for the hand collision (relative to the head joint, rest frame): skull sphere from
+  // assets/body_colliders.json ("head", neutral body) + a face sphere for nose/chin, scaled with the head height
+  const hk = headH / 1.515;
+  const headSphere = { c1: [0, 0.034 * hk, 0.012 * hk], r1: 0.078 * hk, c2: [0, 0.012 * hk, 0.062 * hk], r2: 0.062 * hk };
   return {
     ...geo, H, hands, eyeOffset: eo,
-    eyeHeight: headH + eo[1], torsoLen,
+    eyeHeight: headH + eo[1], torsoLen, headSphere,
     upperLen: vLen(vSub(H.head, H.hips)),
     footX: SIDES.map(s => H[`${s}Foot`][0]), footZ: SIDES.map(s => H[`${s}Foot`][2]),
     minPelvisY: clamp(geo.ankleHeight + 0.28 * geo.legLength, 0.1, 2),

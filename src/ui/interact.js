@@ -7,7 +7,7 @@ import { LAYERS } from '../avatar.js';
 
 const POKE_DOWN = 0.008, POKE_UP = 0.022, POKE_NEAR = 0.07, POKE_BEHIND = -0.04;
 
-export function createInteraction({ scene, camera, dom, getPanels, getTip, onGrabEnd, onClickFeedback }) {
+export function createInteraction({ scene, camera, dom, getPanels, getTip, onGrabEnd, onClickFeedback, haptics = () => true }) {
   const sides = ['left', 'right'];
   const st = {};
   for (const s of sides) {
@@ -57,7 +57,8 @@ export function createInteraction({ scene, camera, dom, getPanels, getTip, onGra
   }
 
   function haptic(side, strength = 0.35, ms = 22) {
-    try { const a = st[side].source?.gamepad?.hapticActuators?.[0]; a?.pulse?.(strength, ms); } catch { /* optional */ }
+    // haptics: none on the Steam Frame in the community Chromium build (empty hapticActuators; docs/DEVICE_NOTES.md)
+    if (haptics()) { try { const a = st[side].source?.gamepad?.hapticActuators?.[0]; a?.pulse?.(strength, ms); } catch { /* optional */ } }
     onClickFeedback?.(side);
   }
 

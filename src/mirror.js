@@ -9,6 +9,7 @@
 // per eye per frame (docs/DEVICE_NOTES.md has the numbers). docs/IK.md is unrelated; see README "Mirror".
 import * as THREE from 'three';
 import { LAYERS } from './avatar.js';
+import { mirrorFrustum } from './render/mirrormath.js';
 
 export const MIRROR_QUALITY = {
   high: { stereo: true, size: 1024, samples: 4, every: 1 },
@@ -16,7 +17,7 @@ export const MIRROR_QUALITY = {
   low: { stereo: false, size: 512, samples: 0, every: 2 },
 };
 
-export function createMirror({ renderer, scene, width, height, quality = 'high', name = 'Mirror', tint = 0.93 }) {
+export function createMirror({ renderer, scene, width, height, quality = 'high', name = 'Mirror', tint = 0.93, opacity = 1 }) {
   let Q = MIRROR_QUALITY[quality] || MIRROR_QUALITY.high;
   const group = new THREE.Group(); group.name = name;
   const geo = new THREE.PlaneGeometry(width, height);
@@ -32,7 +33,7 @@ export function createMirror({ renderer, scene, width, height, quality = 'high',
   const mats = { L: null, R: null, M: null };
   const meshes = {};
   for (const [k, layer] of [['L', LAYERS.EYE_L], ['R', LAYERS.EYE_R], ['M', LAYERS.MONO]]) {
-    mats[k] = new THREE.MeshBasicMaterial({ color: new THREE.Color(tint, tint, tint) });
+    mats[k] = new THREE.MeshBasicMaterial({ color: new THREE.Color(tint, tint, tint), transparent: opacity < 1, opacity, depthWrite: opacity >= 1 });
     const m = new THREE.Mesh(geo, mats[k]);
     m.layers.set(layer); m.name = `${name}_${k}`; m.frustumCulled = false;
     group.add(m); meshes[k] = m;
@@ -53,37 +54,28 @@ export function createMirror({ renderer, scene, width, height, quality = 'high',
   cam.matrixAutoUpdate = false; cam.matrixWorldAutoUpdate = false;
   cam.layers.disableAll(); cam.layers.enable(LAYERS.MAIN); cam.layers.enable(LAYERS.HEAD);
 
-  const pa = new THREE.Vector3(), pb = new THREE.Vector3(), pc = new THREE.Vector3(), n = new THREE.Vector3();
-  const vr = new THREE.Vector3(), vu = new THREE.Vector3(), vn = new THREE.Vector3(), ve = new THREE.Vector3();
-  const va = new THREE.Vector3(), vb = new THREE.Vector3(), vc = new THREE.Vector3(), tmp = new THREE.Vector3();
-  const pav = new THREE.Vector3(), pbv = new THREE.Vector3(), pcv = new THREE.Vector3();
+  const pa = new THREE.Vector3(), pb = new THREE.Vector3(), pc = new THREE.Vector3();
+  const vr = new THREE.Vector3(), vu = new THREE.Vector3(), vn = new THREE.Vector3(), ve = new THREE.Vector3(), tmp = new THREE.Vector3();
   const M = new THREE.Matrix4();
   let frame = 0, enabled = true;
   const stats = { renders: 0, ms: 0, skipped: 0 };
 
   /** Set up cam for eye E (world). Returns false when the eye is behind the mirror. */
+  // the frustum math is pure (src/render/mirrormath.js, numerically tested per eye in tests/mirror.test.mjs)
+  const A3 = v => [v.x, v.y, v.z];
   function setupCamera(E) {
     const mw = group.matrixWorld;
     pa.set(-width / 2, -height / 2, 0).applyMatrix4(mw);
     pb.set(width / 2, -height / 2, 0).applyMatrix4(mw);
     pc.set(-width / 2, height / 2, 0).applyMatrix4(mw);
-    n.set(0, 0, 1).transformDirection(mw);
-    const d = tmp.subVectors(E, pa).dot(n);
-    if (d < 0.01) return false;
-    ve.copy(E).addScaledVector(n, -2 * d);                  // reflected eye
-    // screen as seen from behind: corners swapped left/right
-    pav.copy(pb); pbv.copy(pa); pcv.copy(pb).add(tmp.subVectors(pc, pa));
-    vr.subVectors(pbv, pav).normalize(); vu.subVectors(pcv, pav).normalize(); vn.crossVectors(vr, vu).normalize();
-    va.subVectors(pav, ve); vb.subVectors(pbv, ve); vc.subVectors(pcv, ve);
-    const dist = -va.dot(vn);
-    const near = Math.max(0.01, dist), far = 40;
-    const k = near / dist;
-    const l = vr.dot(va) * k, r = vr.dot(vb) * k, b = vu.dot(va) * k, t = vu.dot(vc) * k;
-    cam.projectionMatrix.makePerspective(l, r, t, b, near, far);
+    const F = mirrorFrustum(A3(E), A3(pa), A3(pb), A3(pc), { far: 40 });
+    if (!F) return false;
+    cam.projectionMatrix.makePerspective(F.l, F.r, F.t, F.b, F.near, F.far);
     cam.projectionMatrixInverse.copy(cam.projectionMatrix).invert();
+    vr.fromArray(F.vr); vu.fromArray(F.vu); vn.fromArray(F.vn); ve.fromArray(F.eye);
     M.makeBasis(vr, vu, vn).setPosition(ve);
     cam.matrix.copy(M); cam.matrixWorld.copy(M); cam.matrixWorldInverse.copy(M).invert();
-    cam.near = near; cam.far = far;
+    cam.near = F.near; cam.far = F.far;
     return true;
   }
 
