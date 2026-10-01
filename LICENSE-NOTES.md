@@ -4,9 +4,9 @@ This is a summary, not legal advice.
 
 | Part | Source | License | Where / consequence |
 |---|---|---|---|
-| Project code (`src/`, `tools/`, `tests/`, `index.html`) | this project | owner's choice (no LICENSE file yet = all rights reserved) | Add a LICENSE before publishing the repo. The IK (including clip-driven legs, body collision, calibration), finger mapping and filtering (One-Euro filter implemented from the published algorithm description), mirror, quality scaler and UI are original code; no code was copied from VRIK / Final IK, three-vrm or similar projects. |
+| Project code (`src/`, `tools/`, `tests/`, `index.html`) | this project | MIT (see `LICENSE`) | Copyright (c) 2026 Kasper Olesen. The IK (including clip-driven legs, body collision, calibration), finger mapping and filtering (One-Euro filter implemented from the published algorithm description), mirror, quality scaler and UI are original code; no code was copied from VRIK / Final IK, three-vrm or similar projects. |
 | three.js 0.170 (+ addons: GLTFLoader etc.) | mrdoob/three.js via cdn.jsdelivr.net (importmap) | MIT | Loaded at runtime from the CDN, not vendored. |
-| CharacterCreator web modules (`vendor/cc/`) | the sibling CharacterCreator project (same owner) | owner's choice | Synced copies, git-ignored. They are not modified here; `npm run sync` re-copies them. |
+| CharacterCreator web modules (`vendor/cc/`) | the sibling CharacterCreator project (same owner) | MIT (same owner; see `LICENSE`) | Synced copies, git-ignored. They are not modified here; `npm run sync` re-copies them. |
 | Character, hair, clothing assets (`assets/`) | CharacterCreator `output/` (derived from the MakeHuman system assets) | CC0 1.0 (see CharacterCreator's LICENSE-NOTES.md for the per-asset table; the trench coat's extension is project-original) | Synced, git-ignored; shipped in a staged site. |
 | Room, mirror frame, plant, floor marker | generated in code (`src/room.js`) | project code | No external assets. |
 | Sky dome, blob shadow, floor reflection, ghost hands, garment/hair thumbnails, photo mode | generated in code (`src/room.js`, `src/render/*.js`, `src/ghosthands.js`) | project code | Shaders/canvas gradients written for this project; thumbnails and photos are rendered at runtime from the synced CC0 assets. No texture/HDR downloads. |

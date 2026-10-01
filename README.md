@@ -145,4 +145,4 @@ Settings persist in `localStorage`; URL parameters win for that page load.
 - **`tools/`**: `sync_assets`, `serve`, `emulate_shots`, `stage_site`, `make_fixtures`, `bench_ik`, `browser`.
 - **`tests/`**: node tests and fixtures (`rest_heads.json`, `replay_walk.json`, the latter recorded in emulation).
 
-See `LICENSE-NOTES.md` for third-party code and asset licences.
+The code in this repository is released under the MIT license (`LICENSE`). See `LICENSE-NOTES.md` for third-party code and asset licences.
