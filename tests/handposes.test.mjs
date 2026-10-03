@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The emulation hand poses (src/dev/handposes.js) read back through the real finger pipeline with the
 // intended curls, for the left data and IWER's mirrored right hand. Uses IWER's own relaxed pose data.
 import { test } from 'node:test';

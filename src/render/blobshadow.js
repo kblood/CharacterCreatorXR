@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Blob shadows: three soft dark discs (pelvis + both feet) on the floor, from a drawn radial gradient. They cost
 // almost nothing, so they stay on at every quality level (the real shadow map is off on 'low'); they are on
 // the MAIN layer, so the mirror shows them too. Fade with the height above the floor (jumping, lifted feet).

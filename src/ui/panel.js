@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // CanvasTexture panel: a flat quad (layer UI) whose texture is a 2D canvas with simple widgets.
 // Widgets are plain objects in canvas pixels: { id, kind, x, y, w, h, label, ... }. The panel redraws only when
 // marked dirty (hover / value change) or, for live panels, at a fixed rate. Pointers talk in canvas pixels

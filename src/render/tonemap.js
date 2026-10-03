@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Pure colour helpers for read-back pixels (src/render/snapshot.js). Unit-tested.
 
 /** Khronos PBR Neutral tone mapping (same constants as three.js' NeutralToneMapping), in place on [r,g,b]. */

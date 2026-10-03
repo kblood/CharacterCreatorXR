@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Save / load a character: this app's own JSON format (not the CharacterCreator desktop format)
 //   { kind: 'ccxr-character', version: 1, app: 'CharacterCreatorXR', name, created, sex: 'male'|'female',
 //     body: { sliderId: -1..1 }, skin: '#rrggbb', hair: id|null, hairColor: '#rrggbb'|null,

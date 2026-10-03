@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Rest data the VR IK needs, derived from the rest joint heads of the CURRENT body (character frame: +X = the
 // character's left, +Y up, +Z forward, metres; see vendor/cc/animation/canonical.js). Pure, no three.js.
 //   heads: humanoid.restHeads(h) in the browser, rig.headsFromSidecar(sidecar, influences) in node.

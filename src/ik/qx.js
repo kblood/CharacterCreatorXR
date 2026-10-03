@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Extra pure math for the IK (arrays: vectors [x,y,z], quaternions [x,y,z,w], like vendor qmath.js).
 // No three.js, runs in node. Builds on the synced CharacterCreator qmath.js (never edited here).
 import { qMul, qConj, qNormalize, qRotate, qAxisAngle, vDot, vCross, vNorm, vLen, vSub, vScale, vAdd } from '../../vendor/cc/animation/qmath.js';

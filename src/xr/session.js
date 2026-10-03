@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // WebXR session start with generous optional features and graceful fallbacks. Nothing here is required except
 // 'immersive-vr' itself: hand tracking, floor-level spaces, layers etc. are all optional and reported in the
 // status panel (enabledFeatures when the browser exposes it, otherwise what was actually obtained).

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // DEV ONLY: installs the Immersive Web Emulation Runtime (IWER, MIT, Meta) when the page is opened with
 // ?emulate=quest3|hands|fingers. Used by tools/emulate_shots.mjs in headless Chrome. It is never loaded
 // otherwise. 'fingers' is a FAKE controller ('test-finger-controller') with extra analog buttons 7..10 and an

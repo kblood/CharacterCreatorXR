@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Clip-driven legs for the tracked avatar (docs/IK.md "Legs"). The CharacterCreator locomotion clips
 // (vendor/cc/animation/clips.js: walk, run, walk_back, strafe_left, strafe_right, fall, jump, idle variants) are
 // sampled ONCE per body into small tables (leg shape per phase), then blended per frame without allocating:

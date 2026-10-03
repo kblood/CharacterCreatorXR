@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // In-VR / desktop UI. Panels (src/ui/panel.js, canvas textures; ray / poke / mouse via src/ui/interact.js):
 //  - the main board (tabs Clothes / Body / Hair / Outfits / Calibrate / Scene / System), standing next to the
 //    mirror, grabbable, placed for the user on first use;

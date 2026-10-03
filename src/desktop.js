@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Desktop fallback (no headset): mouse look + WASD, simulated hands and fingers, producing the same tracking
 // record as XR. Keys: W/A/S/D move, C crouch, Space arms up, F reach forward, 1..4 finger poses
 // (open / fist / point / pinch), left mouse = right trigger, right mouse = right grip, T third-person view.

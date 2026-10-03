@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Pooled vector/quaternion math for the per-frame IK hot path (same conventions and semantics as
 // vendor/cc/animation/qmath.js + src/ik/qx.js: vectors [x,y,z], quaternions [x,y,z,w], Hamilton product).
 //

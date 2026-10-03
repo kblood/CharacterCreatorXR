@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Shared puppeteer-core helpers for the emulation scripts (system Chrome/Edge, no Chromium download).
 import puppeteer from 'puppeteer-core';
 import { existsSync } from 'node:fs';

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // DEV/TEST ONLY: extra IWER hand poses (open hand, fist, custom curls) derived from IWER's own relaxed pose by
 // flexing each finger chain about its hinges. IWER only ships relaxed / pinch / point; the emulation scenarios
 // need open and fist too. Pure (column-major 4x4 arrays, IWER's left-hand data; IWER mirrors it for the right).

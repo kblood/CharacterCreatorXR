@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // CharacterCreator XR: boot, frame loop, glue. Per frame:
 //   tracking (XR | desktop | replay) -> ('own' scale: tracked world scaled) -> calibration -> finger input layer ->
 //   VRIK solve -> avatar pose + placement -> eyes / hair / breast / cloth -> blob shadows, ghost hands, UI ->

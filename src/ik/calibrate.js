@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Height / arm calibration. Pure. docs/IK.md "Calibration".
 // The avatar is fitted to the user in two steps: the CharacterCreator 'height' slider (a real body change, so the
 // cloth colliders, proportions and sidecar joints stay consistent), then a uniform scale for the residual

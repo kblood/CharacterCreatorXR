@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { pickPreset, createAutoScaler, LEVELS, levelOfPreset, PRESETS } from '../src/quality.js';

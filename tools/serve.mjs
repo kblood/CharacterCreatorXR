@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Tiny static server for local development (no dependencies). WebXR needs a secure context: http://localhost
 // counts as secure, so on a Quest use `adb reverse tcp:8080 tcp:8080` and open http://localhost:8080 in the
 // headset browser (README "Headset access"). Serves the project root; never uploads anything anywhere.

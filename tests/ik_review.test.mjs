@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Regression tests for the IK review findings (state machines firing on the wrong motion, wrist pop, armScale
 // consistency, reset). Each test is the reviewer's repro turned into an assertion.
 import test from 'node:test';

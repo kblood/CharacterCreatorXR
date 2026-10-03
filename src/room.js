@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // A small procedural room: floor with a standing marker, back wall with the mirror, soft lighting.
 // Everything is generated (no texture downloads). The mirror wall faces +Z (the user starts at the origin
 // looking toward -Z, i.e. at the mirror).

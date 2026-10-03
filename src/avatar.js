@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The CharacterCreator character as a VR avatar: body + hair + clothing catalog + cloth + eyes, loaded from the
 // synced assets (assets/, tools/sync_assets.mjs) with the synced CharacterCreator modules (vendor/cc/, never
 // edited here). Update order and ownership follow CharacterCreator: applySliders -> applySkeleton -> re-measure;

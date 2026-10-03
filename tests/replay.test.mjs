@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Regression over a recorded fixture (tests/fixtures/replay_walk.json, recorded from IWER-emulated Quest 3
 // controllers by `node tools/emulate_shots.mjs --fixtures`). Emulated input only - not real headset data.
 import test from 'node:test';

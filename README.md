@@ -145,4 +145,4 @@ Settings persist in `localStorage`; URL parameters win for that page load.
 - **`tools/`**: `sync_assets`, `serve`, `emulate_shots`, `stage_site`, `make_fixtures`, `bench_ik`, `browser`.
 - **`tests/`**: node tests and fixtures (`rest_heads.json`, `replay_walk.json`, the latter recorded in emulation).
 
-The code in this repository is released under the MIT license (`LICENSE`). See `LICENSE-NOTES.md` for third-party code and asset licences.
+The code in this repository is licensed under GPL-3.0-or-later ([LICENSE](LICENSE)), Copyright (C) 2026 Kasper Olesen; it was MIT until 2026-10-03 (earlier commits and copies received under MIT stay MIT). See [LICENSE-NOTES.md](LICENSE-NOTES.md) for third-party code and asset licences, and CharacterCreator's LICENSE-NOTES.md for using the plugin in a game (not legal advice).

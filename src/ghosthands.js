@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Ghost hands: when the avatar's hand cannot follow the tracked hand (blocked by the body collision, beyond the
 // arm's reach, or a clamped wrist), a translucent hand at the TRACKED pose shows the user where their real hand
 // is. Opacity follows the drift (IK result debug.arms[side].drift, metres): invisible below 3 cm, full at 8 cm.

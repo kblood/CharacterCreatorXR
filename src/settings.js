@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Persistent settings (localStorage, every access guarded) + URL parameters (which win over stored values).
 // URL: ?outfit=a,b|none &hair=id|none &sex=female|male|f|m|0|1 &underwear=0 &breast=0 &mirror=0|1 &lang=da|en &desktop=1
 //      &quality=high|medium|low &locomotion=procedural|clips &emulate=quest3|hands|fingers (IWER, dev only)

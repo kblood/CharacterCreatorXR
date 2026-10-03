@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // One-Euro filters (Casiez, Roussel, Vogel, CHI 2012: "1 Euro Filter: A Simple Speed-based Low-pass Filter for
 // Noisy Input in Interactive Systems"): a low-pass whose cutoff rises with the signal's speed, so slow motion is
 // smoothed strongly (no jitter) and fast motion has little lag. Implemented from the paper's description.

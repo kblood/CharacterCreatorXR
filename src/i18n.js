@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // UI strings (da/en). Keys used by the vendor clothing module are included (clothLoading, clothNone, ...).
 export const STRINGS = {
   da: {

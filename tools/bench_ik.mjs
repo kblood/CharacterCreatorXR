@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: GPL-3.0-or-later
 // IK micro-benchmark: time per solve and bytes allocated per solve for a fixed, deterministic motion
 // (walk in a circle, wave both arms, crouch, turn). Node on a desktop CPU: NOT representative of a headset browser,
 // only useful for before/after comparisons on the same machine.

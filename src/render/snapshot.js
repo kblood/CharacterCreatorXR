@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Offscreen render -> 2D canvas (thumbnails, photo mode). Works inside an XR session like the mirror does
 // (xr.enabled off while rendering into the render target). three.js writes LINEAR colour into render targets,
 // so the read-back pixels get the renderer's tone mapping (Khronos PBR Neutral, as renderer.toneMapping =

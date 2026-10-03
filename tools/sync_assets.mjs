@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Copies the built CharacterCreator assets and the shared web modules into this project.
 //
 //   node tools/sync_assets.mjs [--source|--src <dir>] [--commit <sha>] [--dry] [--no-anim]

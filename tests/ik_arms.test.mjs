@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Upper-body IK invariants: hand-body collision, elbow pole stability (no flips across the chest, overhead,
 // behind the back, at the hips), forearm twist continuity, neck limit, reach lean, left/right mirror symmetry.
 import test from 'node:test';

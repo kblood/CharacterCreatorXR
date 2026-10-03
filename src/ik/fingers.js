@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Finger mapping: every finger source (XRHand joints, controllers with per-finger sensors, plain controllers) is
 // normalised into one FINGER STATE, which is then turned into rest-relative rotations of the avatar's finger bones.
 // Pure, engine-agnostic (arrays). docs/HAND_TRACKING.md.

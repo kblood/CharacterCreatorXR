@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Stages a flat, self-contained static site into build/site/ (or --out <dir>) - LOCAL ONLY.
 // This script never uploads or contacts any server; copy the folder to a static HTTPS host yourself.
 //
