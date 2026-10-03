@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Generic finger-tracking input layer. Every source is normalised into the same per-finger representation
 // (src/ik/fingers.js FingerState: flexion angles + curl 0..1 + a source tag per finger):
 //   (a) 'hand'              XRHand, 25 joints (WebXR Hand Input)

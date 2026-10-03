@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Replay (?replay=fixture.json) and recording of tracking records (src/xr/tracking.js format). A fixture is
 // { version: 1, name, note, frames: [record, ...] } with record.t in seconds. The player interpolates positions
 // and slerps rotations between frames, so a fixture recorded at any rate plays at any frame rate. Finger data

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Planar mirror with a correct per-eye (stereo) reflection. For every eye:
 //   virtual eye E' = E reflected in the mirror plane; the scene is rendered from E' through the mirror rectangle
 //   with an off-axis (Kooima "generalized perspective") frustum whose near plane IS the mirror plane, so nothing

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Per-frame tracking in one plain format for every source (XR, desktop simulation, replay):
 //   { t, head: {pos, quat}, eyes: {L, R} | null, hands: { left|right: {pos, quat, valid, kind} },
 //     snaps: [snapshotSource(...)], sources: [debug rows] }

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Procedural stepping for a 3-point (head + hands) avatar while standing / shuffling / turning in place: feet
 // stay planted in the world and take short arcing steps when the body moves away from them. Pure,
 // engine-agnostic, allocation-free per frame; positions are [x, z] on the floor in the solver's scale-free world

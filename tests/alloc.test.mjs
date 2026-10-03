@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Allocation / time regression guard for the IK solver: runs tools/bench_ik.mjs in a child process (its own
 // heap and JIT state) and checks the bytes allocated per solve. The pre-rewrite solver allocated ~153 KB per
 // solve; the pooled rewrite ~4 KB (residual double boxing in the JIT, see docs/IK.md "Performance").

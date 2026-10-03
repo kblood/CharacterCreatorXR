@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Pure mirror camera math (src/mirror.js uses it; tests/mirror.test.mjs checks it numerically per eye).
 // Kooima "generalized perspective projection" from the eye reflected in the mirror plane, through the mirror
 // rectangle seen from behind (left/right swapped), with the near plane ON the mirror plane.

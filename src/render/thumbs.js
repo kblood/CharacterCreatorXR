@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Thumbnails for the in-VR grids, rendered offscreen and cached (memory + localStorage as small JPEG data URLs).
 //  - garments: the item's own GLB loaded separately and rendered alone in its bind pose, front view, tinted with
 //    the current primary colour (the secondary mask is not applied in the thumbnail). One render per frame at

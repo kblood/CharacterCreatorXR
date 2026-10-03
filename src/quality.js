@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Quality: presets, automatic preset choice (user agent + GPU string + a short GPU benchmark) and an in-session
 // auto-scaler that steps the knobs that can change while presenting (mirror, foveation, shadows, cloth rate)
 // when frames are missed. Pure except gpuBenchmark(). docs/DEVICE_NOTES.md "Performance".

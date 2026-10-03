@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // DEV/TEST ONLY: keyframed driver for the IWER emulated device (headset, controllers, hands, buttons), used by
 // tools/emulate_shots.mjs. window.__scenario.play(spec) -> Promise (resolves when the spec has played).
 // spec = { duration, keys: [{ t, head: {pos, ypr}, left: {pos, ypr}, right: {pos, ypr}, mode: 'controller'|'hand',

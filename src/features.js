@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Runtime feature detection: reports exactly what THIS browser / runtime offers (no device names, no
 // assumptions). probeRuntime() gathers a plain snapshot (browser), describeRuntime() turns it into rows for the UI
 // and the diagnostics file (pure, unit-tested). Shown on the System tab and in diagnostics JSON. docs/DEVICE_NOTES.md.

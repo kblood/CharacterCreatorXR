@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Regenerates tests/fixtures/rest_heads.json from the synced sidecar (assets/base_body.joints.json), so the
 // node tests do not need the 20 MB of synced assets. Run after `npm run sync` when the upstream rig changes.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Pointer interaction with CanvasTexture panels: controller / hand rays (select = trigger or pinch), index-finger
 // poke (the avatar's own fingertip, so it works for controllers and hand tracking alike), mouse on desktop, and
 // grabbing a panel (squeeze while pointing at it, or select on its grab bar). No per-frame allocations in the

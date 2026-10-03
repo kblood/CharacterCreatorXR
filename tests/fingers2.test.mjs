@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Finger / hand input quality: One-Euro filters, lost-tracking hold -> relax, rest-pose spread retargeting,
 // left/right mirroring of the XRHand mapping, per-finger limits, controller grip -> wrist offset.
 import test from 'node:test';

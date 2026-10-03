@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Body volume for the IK: the avatar's torso as a stack of horizontal ellipses (rest frame), a head sphere and
 // thigh capsules, used to keep the avatar's hands and elbows OUT of its own body (docs/IK.md "Hand-body collision").
 // Pure, allocation-free in the hot path (pooled vectors from ./pm.js).

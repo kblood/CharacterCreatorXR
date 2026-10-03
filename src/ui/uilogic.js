@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Pure UI logic (unit-tested): slider drag with a deadzone + release hysteresis, colour conversions for the hue
 // ring, adaptive board placement and the two-palms-up recenter gesture. docs/UI.md.
 

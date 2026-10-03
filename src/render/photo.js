@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Photo mode: a "photographer" camera in front of the avatar (full body or portrait), rendered offscreen with
 // the head visible (src/render/snapshot.js), returned as a canvas; download() saves a PNG. In XR the shot is
 // taken after a countdown so the user can pose; the preview is shown on the board.

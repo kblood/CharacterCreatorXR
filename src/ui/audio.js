@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Optional UI click sound (WebAudio, synthesized: no audio files). The AudioContext is created / resumed on the
 // first user gesture (the Enter VR click or a desktop click); before that, clicks are silent.
 export function createClicker() {

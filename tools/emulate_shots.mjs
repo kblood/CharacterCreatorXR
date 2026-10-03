@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Headless emulation run: IWER (Meta Quest 3 profile, emulated hands, and a FAKE per-finger controller) in a
 // local Chrome/Edge via puppeteer-core. Plays the scenarios, takes screenshots (per eye, third person, mirror,
 // UI, cloth), checks the finger-input paths, measures headless frame times, and writes build/shots/report.json.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Legs / posture: clip-driven walking (forward, backwards, sideways), foot locking, turning in place, sit
 // heuristic, tracked jump state machine, lost-hand hold + relax, clip tables.
 import test from 'node:test';

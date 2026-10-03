@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "WebXR avatar for the CharacterCreator character: VRIK-style IK from head + hands, hand tracking, mirror, in-VR wardrobe.",
+  "license": "GPL-3.0-or-later",
   "type": "module",
   "scripts": {
     "sync": "node tools/sync_assets.mjs",

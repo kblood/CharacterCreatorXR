@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Analytic two-bone IK (law of cosines) with a pole direction. Pure, engine-agnostic (arrays).
 // Used for arms (shoulder -> elbow -> wrist) and legs (hip -> knee -> ankle). docs/IK.md.
 //   solveTwoBoneInto(out, ...)  hot path: writes into a caller-owned result object; its vectors come from the

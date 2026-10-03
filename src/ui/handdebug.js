@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Hand-tracking debug skeleton: the raw XR joints (spheres + bones) of each tracked hand, drawn on the UI layer
 // (not in the mirror). One InstancedMesh + one LineSegments, no per-frame allocations.
 import * as THREE from 'three';

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // VRIK-style full-body solve from 3 tracked points (head + 2 hands), written from scratch for this project
 // (no code from VRIK / three-vrm / other projects). Pure, engine-agnostic (arrays); output is a canonical
 // humanoid pose (vendor/cc/animation/canonical.js) + a placement for the avatar's parent object (bones are

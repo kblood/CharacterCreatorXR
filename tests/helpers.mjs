@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Shared helpers for the node tests: the neutral rig and synthetic tracking input.
 import { readFileSync } from 'node:fs';
 import { prepareRig } from '../src/ik/rigdata.js';
