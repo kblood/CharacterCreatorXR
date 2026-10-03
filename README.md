@@ -123,7 +123,7 @@ Settings persist in `localStorage`; URL parameters win for that page load.
 | Steam Frame | **not verified**. The stock browser has no WebXR; a community build is the only route today (see `docs/DEVICE_NOTES.md`, with a test recipe) |
 | Frame rate / GPU cost on headsets | **not measured**: headless numbers are desktop and not representative |
 | Haptics, sound, legibility, comfort | **not verified** on a device |
-| New CharacterCreator garments (dress, jacket/vest, boots) | **not available**: not committed in the CharacterCreator repo at sync time; they appear automatically after a later sync |
+| New CharacterCreator garments (dress, jacket, boots) | **available after `npm run sync`**: committed in CharacterCreator (22153cf) and read generically from `clothing.json`; a local sync from CharacterCreator master has them (sha256 identical to its `output/`). **Not verified in VR or emulation**: the emulation checks above predate them |
 
 ## Layout
 

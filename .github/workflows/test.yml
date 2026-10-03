@@ -1,0 +1,32 @@
+# Node unit tests (npm test): IK, calibration, fingers, UI logic, mirror maths, replay.
+# The tests import the shared CharacterCreator web modules from vendor/cc/ (git-ignored, written by
+# tools/sync_assets.mjs), so the job checks out the public CharacterCreator repo and syncs from it first.
+# The browser checks (npm run shots) are not part of CI.
+# PROVISIONAL (ROADMAP decision 3): kept on a local branch, not pushed; the roadmap recommends pushing it after M2.
+name: test
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: kblood/CharacterCreator
+          path: cc-src
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts
+      - run: node tools/sync_assets.mjs --source cc-src
+      - run: npm test
